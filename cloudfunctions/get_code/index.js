@@ -1,7 +1,7 @@
 // 云函数入口文件
 const cloud = require('wx-server-sdk')
 cloud.init({
-  env: '填写你的环境ID'
+  env: cloud.DYNAMIC_CURRENT_ENV
 })
 
 // 云函数入口函数

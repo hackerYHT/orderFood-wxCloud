@@ -5,7 +5,7 @@ const axios = require('axios')
 const crypto = require('crypto')
 
 cloud.init({
-  env: '填写你的环境ID'
+  env: cloud.DYNAMIC_CURRENT_ENV
 })
 
 const db = cloud.database()

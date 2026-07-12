@@ -5,7 +5,7 @@
   <view class="status-bar" style="height: {{statusBarHeight}}px;"></view>
   <!-- 店名 -->
   <view class="shop-header">
-    <text class="shop-name">{{shopInfo.name || '餐饮店'}}</text>
+    <text class="shop-name">{{shopInfo.name || '老叶原汤手工拉面'}}</text>
   </view>
 
   <!-- 轮播公告 -->

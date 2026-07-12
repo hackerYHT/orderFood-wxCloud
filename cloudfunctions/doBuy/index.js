@@ -1,7 +1,7 @@
 // 云函数入口文件
 const cloud = require('wx-server-sdk')
 cloud.init({
-  env: '填写你的环境ID'
+  env: cloud.DYNAMIC_CURRENT_ENV
 })
 
 
@@ -87,7 +87,7 @@ function generatePrintContent(order, shopInfo) {
   content += `<C></C><BR>`
   content += `<C></C><BR>`
   content += `<C><font# bolder=1 height=2 width=2>${orderTypeText}订单</font#></C><BR>`
-  content += `<C><font# bolder=1 height=2 width=2>${escapeHtml(shopInfo?.name || '餐饮店')}</font#></C><BR>`
+  content += `<C><font# bolder=1 height=2 width=2>${escapeHtml(shopInfo?.name || '老叶原汤手工拉面')}</font#></C><BR>`
   content += `<BR>`
   
   // 订单编号和时间

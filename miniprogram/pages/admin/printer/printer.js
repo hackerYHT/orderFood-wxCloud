@@ -389,7 +389,7 @@ Page({
       const orderTypeText = testOrder.orderType === 'dineIn' ? '堂食' : '打包'
       
       let content = `<C><font# bolder=1 height=2 width=2>${orderTypeText}订单</font#></C><BR>`
-      content += `<C><font# bolder=1 height=2 width=2>${escapeHtml(shopInfo?.name || '餐饮店')}</font#></C><BR>`
+      content += `<C><font# bolder=1 height=2 width=2>${escapeHtml(shopInfo?.name || '老叶原汤手工拉面')}</font#></C><BR>`
       content += `<BR>`
       
       // 订单编号和时间

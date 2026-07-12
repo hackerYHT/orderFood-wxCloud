@@ -73,11 +73,24 @@
     "tabSize": 2
   },
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "images/githubImg"
+      },
+      {
+        "type": "file",
+        "value": "images/bg.png"
+      },
+      {
+        "type": "file",
+        "value": "README.md"
+      }
+    ],
     "include": []
   },
-  "appid": "wx57595aaf3f7c3344",
+  "appid": "wx14a4724f0c238f3e",
   "cloud": true,
-  "libVersion": "3.8.0",
+  "libVersion": "3.12.1",
   "simulatorPluginLibVersion": {}
 }
