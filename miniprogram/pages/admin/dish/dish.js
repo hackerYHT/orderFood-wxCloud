@@ -42,7 +42,7 @@ Page({
       required: true, // 是否必选
       options: []
     },
-    newOption: '', // 临时输入的选项
+    allDishesForOptions: [], // 可作为标签选项的菜品列表
     // 菜品分页
     dishPage: 0,
     dishPageSize: 20,
@@ -53,11 +53,13 @@ Page({
   onLoad() {
     this.loadCategories()
     this.loadDishes()
+    this.loadAllDishesForOptions()
   },
 
   onShow() {
     this.loadCategories()
     this.loadDishes()
+    this.loadAllDishesForOptions()
   },
 
   // ==================== 分类管理 ====================
@@ -300,6 +302,98 @@ Page({
     if (this.data.dishHasMore && !this.data.loadingDishes && this.data.currentCategoryId) {
       this.loadDishes(true)
     }
+  },
+
+  // 加载全部菜品，用于配置“已有菜品作为标签选项”
+  async loadAllDishesForOptions() {
+    try {
+      const pageSize = 20
+      let page = 0
+      let allDishes = []
+      let hasMore = true
+
+      while (hasMore) {
+        const res = await db.collection('dish')
+          .orderBy('sort', 'asc')
+          .skip(page * pageSize)
+          .limit(pageSize)
+          .get()
+        const list = res.data || []
+        allDishes = allDishes.concat(list)
+        hasMore = list.length === pageSize
+        page += 1
+      }
+
+      this.setData({
+        allDishesForOptions: this.buildOptionDishList(allDishes, this.data.currentTag.options)
+      })
+    } catch (err) {
+      console.error('加载标签选项菜品失败', err)
+    }
+  },
+
+  buildOptionDishList(dishes, selectedOptions = []) {
+    const selectedDishIds = selectedOptions.map(option => this.getOptionDishId(option)).filter(Boolean)
+    const currentDishId = this.data.currentDish && this.data.currentDish._id
+
+    return (dishes || []).map(dish => ({
+      _id: dish._id,
+      name: dish.name,
+      price: Number(dish.price) || 0,
+      image: dish.image || '',
+      categoryName: dish.categoryName || '',
+      optionSelected: selectedDishIds.includes(dish._id),
+      optionDisabled: !!currentDishId && dish._id === currentDishId
+    }))
+  },
+
+  getOptionDishId(option) {
+    if (!option) return ''
+    if (typeof option === 'string') return ''
+    return option.dishId || option._id || ''
+  },
+
+  normalizeTagOptions(options = []) {
+    return options.map(option => {
+      if (typeof option === 'string') {
+        return {
+          name: option,
+          price: 0,
+          image: '',
+          defaultSelected: false
+        }
+      }
+      return {
+        dishId: option.dishId || option._id || '',
+        name: option.name || option.dishName || '',
+        price: Number(option.price) || 0,
+        image: option.image || option.dishImage || '',
+        defaultSelected: option.defaultSelected === true
+      }
+    })
+  },
+
+  normalizeDefaultOptionsForTag(tag) {
+    const nextTag = {
+      ...tag,
+      options: this.normalizeTagOptions(tag.options || [])
+    }
+
+    if (nextTag.type === 'single') {
+      let hasDefault = false
+      nextTag.options = nextTag.options.map(option => {
+        if (option.defaultSelected && !hasDefault) {
+          hasDefault = true
+          return option
+        }
+        return {
+          ...option,
+          defaultSelected: false
+        }
+      })
+    }
+
+    return nextTag
   },
 
   // 显示添加菜品弹窗
@@ -656,6 +750,7 @@ Page({
 
       this.closeDishModal()
       this.loadDishes()
+      this.loadAllDishesForOptions()
     } catch (err) {
       wx.hideLoading()
       console.error('保存失败', err)
@@ -687,6 +782,7 @@ Page({
             })
 
             this.loadDishes()
+            this.loadAllDishesForOptions()
           } catch (err) {
             wx.hideLoading()
             console.error('删除失败', err)
@@ -704,16 +800,17 @@ Page({
 
   // 显示添加标签弹窗
   showAddTagModal() {
+    const currentTag = {
+      name: '',
+      type: 'single',
+      required: true,
+      options: []
+    }
     this.setData({
       showTagModal: true,
       editingTagIndex: -1,
-      currentTag: {
-        name: '',
-        type: 'single',
-        required: true,
-        options: []
-      },
-      newOption: ''
+      currentTag,
+      allDishesForOptions: this.buildOptionDishList(this.data.allDishesForOptions, currentTag.options)
     })
   },
 
@@ -721,11 +818,15 @@ Page({
   showEditTagModal(e) {
     const index = e.currentTarget.dataset.index
     const tag = this.data.currentDish.tags[index]
+    const currentTag = {
+      ...JSON.parse(JSON.stringify(tag)),
+      options: this.normalizeTagOptions(tag.options || [])
+    }
     this.setData({
       showTagModal: true,
       editingTagIndex: index,
-      currentTag: JSON.parse(JSON.stringify(tag)), // 深拷贝
-      newOption: ''
+      currentTag,
+      allDishesForOptions: this.buildOptionDishList(this.data.allDishesForOptions, currentTag.options)
     })
   },
 
@@ -746,9 +847,11 @@ Page({
   // 选择标签类型
   selectTagType(e) {
     const type = e.currentTarget.dataset.type
-    this.setData({
-      'currentTag.type': type
+    const currentTag = this.normalizeDefaultOptionsForTag({
+      ...this.data.currentTag,
+      type
     })
+    this.setData({ currentTag })
   },
 
   // 切换是否必选
@@ -758,37 +861,53 @@ Page({
     })
   },
 
-  // 输入新选项
-  onOptionInput(e) {
+  // 勾选/取消已有菜品作为标签选项
+  toggleOptionDish(e) {
+    const dish = e.currentTarget.dataset.dish
+    if (!dish || dish.optionDisabled) return
+
+    const currentTag = JSON.parse(JSON.stringify(this.data.currentTag))
+    const options = this.normalizeTagOptions(currentTag.options || [])
+    const index = options.findIndex(option => option.dishId === dish._id)
+
+    if (index > -1) {
+      options.splice(index, 1)
+    } else {
+      options.push({
+        dishId: dish._id,
+        name: dish.name,
+        price: Number(dish.price) || 0,
+        image: dish.image || '',
+        defaultSelected: false
+      })
+    }
+
+    currentTag.options = options
     this.setData({
-      newOption: e.detail.value
+      currentTag,
+      allDishesForOptions: this.buildOptionDishList(this.data.allDishesForOptions, options)
     })
   },
 
-  // 添加选项
-  addOption() {
-    const { currentTag, newOption } = this.data
-    if (!newOption.trim()) {
-      wx.showToast({
-        title: '请输入选项内容',
-        icon: 'none'
-      })
-      return
-    }
+  // 切换标签选项是否默认选中
+  toggleDefaultOption(e) {
+    const index = e.currentTarget.dataset.index
+    const currentTag = JSON.parse(JSON.stringify(this.data.currentTag))
+    const options = this.normalizeTagOptions(currentTag.options || [])
+    const option = options[index]
 
-    if (currentTag.options.includes(newOption.trim())) {
-      wx.showToast({
-        title: '选项已存在',
-        icon: 'none'
-      })
-      return
-    }
+    if (!option) return
 
-    currentTag.options.push(newOption.trim())
-    this.setData({
-      currentTag,
-      newOption: ''
-    })
+    const nextDefaultSelected = !option.defaultSelected
+    if (currentTag.type === 'single' && nextDefaultSelected) {
+      options.forEach(item => {
+        item.defaultSelected = false
+      })
+    }
+    options[index].defaultSelected = nextDefaultSelected
+    currentTag.options = options
+
+    this.setData({ currentTag })
   },
 
   // 删除选项
@@ -797,7 +916,8 @@ Page({
     const { currentTag } = this.data
     currentTag.options.splice(index, 1)
     this.setData({
-      currentTag
+      currentTag,
+      allDishesForOptions: this.buildOptionDishList(this.data.allDishesForOptions, currentTag.options)
     })
   },
 
@@ -813,9 +933,12 @@ Page({
       return
     }
 
+    const normalizedTag = this.normalizeDefaultOptionsForTag(currentTag)
+    currentTag.options = normalizedTag.options
+
     if (currentTag.options.length === 0) {
       wx.showToast({
-        title: '请至少添加一个选项',
+        title: '请至少选择一个菜品',
         icon: 'none'
       })
       return

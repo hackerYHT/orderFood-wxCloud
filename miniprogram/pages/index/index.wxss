@@ -695,6 +695,13 @@
   font-size: 26rpx;
   color: #666;
   transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.tag-option-price {
+  color: #e54d42;
 }
 
 .tag-option.selected {
@@ -702,6 +709,10 @@
   border-color: #e54d42;
   color: white;
   font-weight: bold;
+}
+
+.tag-option.selected .tag-option-price {
+  color: white;
 }
 
 /* 数量选择 */
@@ -795,4 +806,3 @@
   font-size: 28rpx;
   font-weight: bold;
 }
-

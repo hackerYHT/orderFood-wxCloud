@@ -1,5 +1,4 @@
 <!--pages/index/index.wxml-->
-<wxs module="tagHelper" src="../../utils/tagHelper.wxs"></wxs>
 <view class="page">
   <!-- 状态栏占位 -->
   <view class="status-bar" style="height: {{statusBarHeight}}px;"></view>
@@ -107,7 +106,7 @@
                 {{tagVal}}
               </text>
             </view>
-            <view class="cart-goods-price">¥{{item.info.price}} × {{item.count}}</view>
+            <view class="cart-goods-price">¥{{item.unitPrice || item.info.price}} × {{item.count}}</view>
           </view>
         </view>
         <view class="cart-goods-actions">
@@ -169,14 +168,15 @@
           <!-- 单选 -->
           <view class="tag-options" wx:if="{{tag.type === 'single'}}">
             <view 
-              class="tag-option {{selectedTags[tag.id] === option ? 'selected' : ''}}"
+              class="tag-option {{option.selected ? 'selected' : ''}}"
               wx:for="{{tag.options}}"
               wx:key="index"
               wx:for-item="option"
               bindtap="selectTagOption"
               data-tag-id="{{tag.id}}"
-              data-option="{{option}}">
-              {{option}}
+              data-option-id="{{option.id}}">
+              <text>{{option.name}}</text>
+              <text class="tag-option-price" wx:if="{{option.price > 0}}">+¥{{option.price}}</text>
             </view>
           </view>
 
@@ -186,11 +186,12 @@
               wx:for="{{tag.options}}"
               wx:key="index"
               wx:for-item="option"
-              class="tag-option {{tagHelper.isTagOptionSelected(selectedTags, tag.id, option) ? 'selected' : ''}}"
+              class="tag-option {{option.selected ? 'selected' : ''}}"
               bindtap="toggleTagOption"
               data-tag-id="{{tag.id}}"
-              data-option="{{option}}">
-              {{option}}
+              data-option-id="{{option.id}}">
+              <text>{{option.name}}</text>
+              <text class="tag-option-price" wx:if="{{option.price > 0}}">+¥{{option.price}}</text>
             </view>
           </view>
         </view>

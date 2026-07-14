@@ -203,7 +203,9 @@
                   </view>
                 </view>
                 <view class="tag-options">
-                  <text class="option-item" wx:for="{{item.options}}" wx:key="*this" wx:for-item="option">{{option}}</text>
+                  <text class="option-item" wx:for="{{item.options}}" wx:key="index" wx:for-item="option">
+                    {{option.name || option}}{{option.price > 0 ? ' +¥' + option.price : ''}}{{option.defaultSelected ? ' 默认' : ''}}
+                  </text>
                 </view>
               </view>
             </view>
@@ -254,22 +256,41 @@
           <switch checked="{{currentTag.required}}" bindchange="onTagRequiredChange" color="#e54d42"/>
         </view>
         <view class="form-item">
-          <view class="form-label">选项列表</view>
+          <view class="form-label">选项菜品</view>
           <view class="option-list">
-            <view class="option-item-row" wx:for="{{currentTag.options}}" wx:key="*this">
-              <text class="option-text">{{item}}</text>
-              <text class="option-delete" bindtap="deleteOption" data-index="{{index}}">删除</text>
+            <view class="option-item-row" wx:for="{{currentTag.options}}" wx:key="index">
+              <view class="option-dish-info">
+                <image class="option-dish-image" wx:if="{{item.image}}" src="{{item.image}}" mode="aspectFill"></image>
+                <view class="option-dish-image placeholder" wx:else>无图</view>
+                <view>
+                  <view class="option-text">{{item.name || item}}</view>
+                  <view class="option-price">+¥{{item.price || 0}}</view>
+                </view>
+              </view>
+              <view class="option-actions">
+                <text class="option-default {{item.defaultSelected ? 'active' : ''}}" bindtap="toggleDefaultOption" data-index="{{index}}">
+                  {{item.defaultSelected ? '已默认' : '设默认'}}
+                </text>
+                <text class="option-delete" bindtap="deleteOption" data-index="{{index}}">删除</text>
+              </view>
             </view>
           </view>
-          <view class="add-option-row">
-            <input 
-              class="option-input" 
-              placeholder="输入选项内容" 
-              value="{{newOption}}"
-              bindinput="onOptionInput"
-            />
-            <view class="add-option-btn" bindtap="addOption">添加</view>
-          </view>
+          <scroll-view class="dish-option-list" scroll-y>
+            <view
+              class="dish-option-row {{item.optionSelected ? 'selected' : ''}} {{item.optionDisabled ? 'disabled' : ''}}"
+              wx:for="{{allDishesForOptions}}"
+              wx:key="_id"
+              bindtap="toggleOptionDish"
+              data-dish="{{item}}">
+              <image class="dish-option-image" wx:if="{{item.image}}" src="{{item.image}}" mode="aspectFill"></image>
+              <view class="dish-option-image placeholder" wx:else>无图</view>
+              <view class="dish-option-info">
+                <view class="dish-option-name">{{item.name}}</view>
+                <view class="dish-option-price">+¥{{item.price || 0}}</view>
+              </view>
+              <view class="dish-option-check">{{item.optionDisabled ? '当前菜品' : (item.optionSelected ? '已选' : '选择')}}</view>
+            </view>
+          </scroll-view>
         </view>
       </scroll-view>
       <view class="modal-footer">

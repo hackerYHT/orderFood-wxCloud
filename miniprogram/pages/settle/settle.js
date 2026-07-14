@@ -59,16 +59,20 @@ Page({
             })
           }
           
+          const unitPrice = Number(item.unitPrice) || Number(item.info.price) || 0
           // 计算小计金额
-          const subtotal = (item.info.price * item.count).toFixed(2)
+          const subtotal = (unitPrice * item.count).toFixed(2)
           
           goodsList.push({
             dishId: item.dishId || item.info._id,
             dishName: item.info.name,
             dishImage: item.info.image,
-            price: item.info.price,
+            price: unitPrice,
+            basePrice: Number(item.basePrice) || Number(item.info.price) || 0,
+            extraPrice: Number(item.extraPrice) || 0,
             count: item.count,
             tags: tagsArray,
+            selectedOptions: item.selectedOptions || [],
             subtotal: subtotal, // 添加小计金额
             canUseMiandan: item.info.canUseMiandan || false // 是否可以参与免单
           })
@@ -264,6 +268,10 @@ Page({
     })
   },
 
+  hasPaidAddons(item) {
+    return (Number(item && item.extraPrice) || 0) > 0
+  },
+
   // 选择支付方式
   selectPayMethod(e) {
     const payMethod = e.currentTarget.dataset.value
@@ -311,7 +319,16 @@ Page({
         })
         return
       }
-      
+
+      if (this.hasPaidAddons(miandanDish)) {
+        wx.showToast({
+          title: '加配菜不能使用免单',
+          icon: 'none',
+          duration: 2000
+        })
+        return
+      }
+
       // 检查订单中是否还有其他菜品（非免单菜品）
       const nonMiandanDishes = orderGoods.filter(item => !item.canUseMiandan || item.dishId !== miandanDish.dishId)
       if (nonMiandanDishes.length > 0) {
@@ -352,7 +369,7 @@ Page({
       if (miandanDishes.length === 1) {
         const miandanDish = miandanDishes[0]
         // 确保只有一份免单菜品，且数量为1
-        if (miandanDish.count === 1 && orderGoods.length === 1) {
+        if (miandanDish.count === 1 && orderGoods.length === 1 && !this.hasPaidAddons(miandanDish)) {
           useMiandan = true
           finalPrice = 0
         }
@@ -375,7 +392,7 @@ Page({
       const miandanDishes = orderGoods.filter(item => item.canUseMiandan === true)
       if (miandanDishes.length === 1) {
         const miandanDish = miandanDishes[0]
-        if (miandanDish.count === 1 && orderGoods.length === 1) {
+        if (miandanDish.count === 1 && orderGoods.length === 1 && !this.hasPaidAddons(miandanDish)) {
           this.updateFinalPrice('miandan')
           return
         }
@@ -487,7 +504,15 @@ Page({
         })
         return
       }
-      
+
+      if (this.hasPaidAddons(miandanDish)) {
+        wx.showToast({
+          title: '加配菜不能使用免单',
+          icon: 'none'
+        })
+        return
+      }
+
       // 检查订单中是否还有其他菜品（非免单菜品）
       const nonMiandanDishes = orderGoods.filter(item => !item.canUseMiandan || item.dishId !== miandanDish.dishId)
       if (nonMiandanDishes.length > 0) {
@@ -653,4 +678,3 @@ Page({
     }, 300)
   }
 })
-

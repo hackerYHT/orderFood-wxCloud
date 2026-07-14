@@ -238,25 +238,125 @@ Page({
 
   // 添加到购物车 - 显示标签选择弹窗
   addToCart(e) {
-    const goods = e.currentTarget.dataset.goods
-    
-    // 初始化标签选择状态，多选标签初始化为数组
-    const selectedTags = {}
-    if (goods.tags && goods.tags.length > 0) {
-      goods.tags.forEach(tag => {
-        if (tag.type === 'multiple') {
-          selectedTags[tag.id] = []
-        }
-      })
-    }
+    const goods = this.normalizeDishTags(e.currentTarget.dataset.goods)
+    const selectedTags = this.buildDefaultSelectedTags(goods)
+    const currentDish = this.updateTagOptionSelectedState(goods, selectedTags)
     
     // 总是显示弹窗，让用户选择数量
     this.setData({
       showTagModal: true,
-      currentDish: goods,
+      currentDish,
       selectedTags: selectedTags,
       modalDishCount: 1,
-      modalTotalPrice: (goods.price * 1).toFixed(2)
+      modalTotalPrice: this.calculateModalTotalPrice(currentDish, selectedTags, 1)
+    })
+  },
+
+  normalizeDishTags(dish) {
+    const normalizedDish = JSON.parse(JSON.stringify(dish || {}))
+    normalizedDish.tags = (normalizedDish.tags || []).map(tag => ({
+      ...tag,
+      options: (tag.options || []).map(option => this.normalizeTagOption(option))
+    }))
+    return this.updateTagOptionSelectedState(normalizedDish, {})
+  },
+
+  normalizeTagOption(option) {
+    if (typeof option === 'string') {
+      return {
+        id: option,
+        name: option,
+        price: 0,
+        image: '',
+        defaultSelected: false
+      }
+    }
+
+    const id = option.id || option.dishId || option._id || option.name || option.dishName
+    return {
+      ...option,
+      id,
+      dishId: option.dishId || option._id || '',
+      name: option.name || option.dishName || '',
+      price: Number(option.price) || 0,
+      image: option.image || option.dishImage || '',
+      defaultSelected: option.defaultSelected === true
+    }
+  },
+
+  buildDefaultSelectedTags(dish) {
+    const selectedTags = {}
+    const tags = (dish && dish.tags) || []
+
+    tags.forEach(tag => {
+      const defaultOptions = (tag.options || [])
+        .map(option => this.normalizeTagOption(option))
+        .filter(option => option.defaultSelected)
+
+      if (tag.type === 'multiple') {
+        selectedTags[tag.id] = defaultOptions.map(option => option.id)
+      } else if (defaultOptions.length > 0) {
+        selectedTags[tag.id] = defaultOptions[0].id
+      }
+    })
+
+    return selectedTags
+  },
+
+  updateTagOptionSelectedState(dish, selectedTags) {
+    const nextDish = JSON.parse(JSON.stringify(dish || {}))
+    nextDish.tags = (nextDish.tags || []).map(tag => ({
+      ...tag,
+      options: (tag.options || []).map(option => {
+        const normalizedOption = this.normalizeTagOption(option)
+        const selectedValue = selectedTags[tag.id]
+        const selected = Array.isArray(selectedValue)
+          ? selectedValue.includes(normalizedOption.id)
+          : selectedValue === normalizedOption.id
+        return {
+          ...normalizedOption,
+          selected
+        }
+      })
+    }))
+    return nextDish
+  },
+
+  getSelectedOptionList(dish, selectedTags) {
+    const selectedOptions = []
+    const tags = (dish && dish.tags) || []
+
+    tags.forEach(tag => {
+      const selectedValue = selectedTags[tag.id]
+      const selectedIds = Array.isArray(selectedValue) ? selectedValue : (selectedValue ? [selectedValue] : [])
+      selectedIds.forEach(optionId => {
+        const option = (tag.options || []).map(item => this.normalizeTagOption(item)).find(item => item.id === optionId)
+        if (option) {
+          selectedOptions.push(option)
+        }
+      })
+    })
+
+    return selectedOptions
+  },
+
+  calculateUnitPrice(dish, selectedTags) {
+    const basePrice = Number(dish && dish.price) || 0
+    const extraPrice = this.getSelectedOptionList(dish, selectedTags)
+      .reduce((sum, option) => sum + (Number(option.price) || 0), 0)
+    return basePrice + extraPrice
+  },
+
+  calculateModalTotalPrice(dish, selectedTags, count) {
+    return (this.calculateUnitPrice(dish, selectedTags) * count).toFixed(2)
+  },
+
+  updateModalPriceAndOptions(selectedTags) {
+    const currentDish = this.updateTagOptionSelectedState(this.data.currentDish, selectedTags)
+    this.setData({
+      currentDish,
+      selectedTags,
+      modalTotalPrice: this.calculateModalTotalPrice(currentDish, selectedTags, this.data.modalDishCount)
     })
   },
 
@@ -286,20 +386,9 @@ Page({
     const cartKey = this.generateCartKey(currentDish._id, selectedTags)
     
     // 转换标签为可显示的数组
-    const tagLabels = []
-    if (currentDish.tags && currentDish.tags.length > 0) {
-      for (let tagId in selectedTags) {
-        const tag = currentDish.tags.find(t => t.id === tagId)
-        if (tag) {
-          const value = selectedTags[tagId]
-          if (Array.isArray(value)) {
-            tagLabels.push(...value)
-          } else {
-            tagLabels.push(value)
-          }
-        }
-      }
-    }
+    const selectedOptions = this.getSelectedOptionList(currentDish, selectedTags)
+    const tagLabels = selectedOptions.map(option => `${option.name}${option.price > 0 ? ' +¥' + option.price : ''}`)
+    const unitPrice = this.calculateUnitPrice(currentDish, selectedTags)
     
     if (cart[cartKey]) {
       cart[cartKey].count += modalDishCount
@@ -308,7 +397,11 @@ Page({
         info: currentDish,
         count: modalDishCount,
         tags: { ...selectedTags },
+        selectedOptions,
         tagLabels: tagLabels, // 用于显示的标签数组
+        unitPrice,
+        basePrice: Number(currentDish.price) || 0,
+        extraPrice: unitPrice - (Number(currentDish.price) || 0),
         dishId: currentDish._id // 保存原始菜品ID
       }
     }
@@ -325,7 +418,7 @@ Page({
     
     const tagStr = Object.keys(tags).sort().map(key => {
       const val = tags[key]
-      return `${key}:${Array.isArray(val) ? val.sort().join(',') : val}`
+      return `${key}:${Array.isArray(val) ? [...val].sort().join(',') : val}`
     }).join('|')
     
     return `${dishId}_${tagStr}`
@@ -439,25 +532,27 @@ Page({
 
   // 选择标签选项（单选）
   selectTagOption(e) {
-    const { tagId, option } = e.currentTarget.dataset
+    const { tagId, optionId } = e.currentTarget.dataset
     const selectedTags = { ...this.data.selectedTags }
-    selectedTags[tagId] = option
-    
-    this.setData({
-      selectedTags: selectedTags
-    })
+    const tag = (this.data.currentDish.tags || []).find(item => item.id === tagId)
+
+    if (selectedTags[tagId] === optionId && tag && !tag.required) {
+      delete selectedTags[tagId]
+    } else {
+      selectedTags[tagId] = optionId
+    }
+
+    this.updateModalPriceAndOptions(selectedTags)
   },
 
   // 切换标签选项（多选）
   toggleTagOption(e) {
-    const { tagId, option } = e.currentTarget.dataset
+    const { tagId, optionId } = e.currentTarget.dataset
     
-    if (!tagId || !option) {
-      console.error('标签ID或选项为空', { tagId, option })
+    if (!tagId || !optionId) {
+      console.error('标签ID或选项为空', { tagId, optionId })
       return
     }
-    
-    console.log('多选标签点击', { tagId, option, currentSelectedTags: this.data.selectedTags })
     
     // 深拷贝，确保不修改原数据
     const selectedTags = JSON.parse(JSON.stringify(this.data.selectedTags || {}))
@@ -472,26 +567,18 @@ Page({
     
     // 创建新数组，避免直接修改
     const tagArray = [...selectedTags[tagId]]
-    const index = tagArray.indexOf(option)
+    const index = tagArray.indexOf(optionId)
     
     if (index > -1) {
       // 已选中，移除
       tagArray.splice(index, 1)
     } else {
       // 未选中，添加
-      tagArray.push(option)
+      tagArray.push(optionId)
     }
     
     selectedTags[tagId] = tagArray
-    
-    console.log('更新后的标签', selectedTags)
-    
-    // 强制更新
-    this.setData({
-      selectedTags: selectedTags
-    }, () => {
-      console.log('setData完成，当前selectedTags:', this.data.selectedTags)
-    })
+    this.updateModalPriceAndOptions(selectedTags)
   },
 
   // 关闭标签弹窗
@@ -508,10 +595,9 @@ Page({
   // 增加弹窗商品数量
   increaseModalCount() {
     const newCount = this.data.modalDishCount + 1
-    const price = this.data.currentDish ? this.data.currentDish.price : 0
     this.setData({
       modalDishCount: newCount,
-      modalTotalPrice: (price * newCount).toFixed(2)
+      modalTotalPrice: this.calculateModalTotalPrice(this.data.currentDish, this.data.selectedTags, newCount)
     })
   },
 
@@ -519,10 +605,9 @@ Page({
   decreaseModalCount() {
     if (this.data.modalDishCount > 1) {
       const newCount = this.data.modalDishCount - 1
-      const price = this.data.currentDish ? this.data.currentDish.price : 0
       this.setData({
         modalDishCount: newCount,
-        modalTotalPrice: (price * newCount).toFixed(2)
+        modalTotalPrice: this.calculateModalTotalPrice(this.data.currentDish, this.data.selectedTags, newCount)
       })
     }
   },
@@ -642,7 +727,7 @@ Page({
     for (let cartKey in cart) {
       if (cart[cartKey] && cart[cartKey].info && cart[cartKey].count) {
         totalCount += cart[cartKey].count
-        totalPrice += cart[cartKey].info.price * cart[cartKey].count
+        totalPrice += (Number(cart[cartKey].unitPrice) || Number(cart[cartKey].info.price) || 0) * cart[cartKey].count
       }
     }
     
@@ -832,9 +917,12 @@ Page({
           dishId: item.dishId || item.info._id,
           dishName: item.info.name,
           dishImage: item.info.image,
-          price: item.info.price,
+          price: Number(item.unitPrice) || Number(item.info.price) || 0,
+          basePrice: Number(item.basePrice) || Number(item.info.price) || 0,
+          extraPrice: Number(item.extraPrice) || 0,
           count: item.count,
           tags: tagsArray, // 改为字符串数组
+          selectedOptions: item.selectedOptions || [],
           canUseMiandan: item.info.canUseMiandan || false // 是否可以参与免单
         })
       }
@@ -846,8 +934,13 @@ Page({
       
       let useMiandan = false
       let finalPrice = this.data.cartTotalPrice
+      const miandanDish = orderGoods.length === 1 ? orderGoods[0] : null
+      const canUseMiandanForOrder = !!miandanDish &&
+        miandanDish.canUseMiandan === true &&
+        miandanDish.count === 1 &&
+        (Number(miandanDish.extraPrice) || 0) === 0
       
-      if (miandanRes.data && miandanRes.data.length > 0 && miandanRes.data[0].count > 0) {
+      if (canUseMiandanForOrder && miandanRes.data && miandanRes.data.length > 0 && miandanRes.data[0].count > 0) {
         // 有免单次数，询问是否使用
         const modalRes = await new Promise((resolve) => {
           wx.showModal({
@@ -992,5 +1085,3 @@ Page({
     }
   }
 })
-
-
