@@ -295,6 +295,13 @@ Page({
     }
   },
 
+  // 滚动到底部时加载更多菜品
+  loadMoreDishes() {
+    if (this.data.dishHasMore && !this.data.loadingDishes && this.data.currentCategoryId) {
+      this.loadDishes(true)
+    }
+  },
+
   // 显示添加菜品弹窗
   showAddDishModal() {
     if (!this.data.currentCategoryId) {

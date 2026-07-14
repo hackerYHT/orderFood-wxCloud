@@ -10,12 +10,14 @@
 .main-content {
   flex: 1;
   display: flex;
+  min-height: 0;
   overflow: hidden;
 }
 
 /* ==================== 左侧分类菜单 ==================== */
 .category-sidebar {
   width: 220rpx;
+  height: 100%;
   background: white;
   border-right: 2rpx solid #f0f0f0;
 }
@@ -90,6 +92,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   background: #f5f5f5;
 }
 
@@ -126,7 +129,16 @@
 /* ==================== 菜品列表 ==================== */
 .dish-list {
   flex: 1;
+  height: 0;
   padding: 20rpx;
+  box-sizing: border-box;
+}
+
+.load-more-tip {
+  padding: 20rpx 0 30rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: #999;
 }
 
 .dish-item {

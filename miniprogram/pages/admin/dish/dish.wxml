@@ -40,7 +40,7 @@
       </view>
 
       <!-- 菜品列表 -->
-      <scroll-view class="dish-list" scroll-y wx:if="{{currentCategoryId}}">
+      <scroll-view class="dish-list" scroll-y bindscrolltolower="loadMoreDishes" wx:if="{{currentCategoryId}}">
         <view class="dish-item" wx:for="{{dishes}}" wx:key="_id">
           <view class="dish-image">
             <image wx:if="{{item.image}}" src="{{item.image}}" mode="aspectFill"></image>
@@ -68,6 +68,8 @@
         </view>
 
         <van-empty wx:if="{{dishes.length === 0}}" description="暂无菜品，点击右上角添加" />
+        <view class="load-more-tip" wx:if="{{dishes.length > 0 && loadingDishes}}">加载中...</view>
+        <view class="load-more-tip" wx:if="{{dishes.length > 0 && !dishHasMore}}">没有更多菜品了</view>
       </scroll-view>
 
       <!-- 未选择分类提示 -->

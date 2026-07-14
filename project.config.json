@@ -75,16 +75,16 @@
   "packOptions": {
     "ignore": [
       {
-        "type": "folder",
-        "value": "images/githubImg"
+        "value": "images/githubImg",
+        "type": "folder"
       },
       {
-        "type": "file",
-        "value": "images/bg.png"
+        "value": "images/bg.png",
+        "type": "file"
       },
       {
-        "type": "file",
-        "value": "README.md"
+        "value": "README.md",
+        "type": "file"
       }
     ],
     "include": []
