@@ -21,14 +21,35 @@
 
   <view class="section">
     <view class="section-title">桌号（选填）</view>
-    <view class="table-code-wrapper">
-      <input
-        class="table-code-input"
-        type="text"
-        placeholder="口头点餐可填写桌号，如：01、A3"
-        value="{{tableNumber}}"
-        bindinput="onTableNumberInput"
-        maxlength="20" />
+    <view class="table-number-wrapper">
+      <picker
+        mode="selector"
+        range="{{tablePickerOptions}}"
+        value="{{tablePickerIndex}}"
+        bindchange="onTableNumberChange">
+        <view class="table-number-picker">
+          <text class="table-number-text {{tableNumber ? '' : 'placeholder'}}">{{tableNumber || '请选择桌号'}}</text>
+          <text class="table-number-arrow">›</text>
+        </view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">是否支付</view>
+    <view class="order-type-list">
+      <view
+        class="order-type-item {{!payStatus ? 'active' : ''}}"
+        data-value="false"
+        bind:tap="selectPayStatus">
+        未支付
+      </view>
+      <view
+        class="order-type-item {{payStatus ? 'active' : ''}}"
+        data-value="true"
+        bind:tap="selectPayStatus">
+        已支付
+      </view>
     </view>
   </view>
 

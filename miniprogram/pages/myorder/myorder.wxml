@@ -14,8 +14,13 @@
           <text wx:elif="{{item.orderType === 'takeOut'}}">📦 打包订单</text>
           <text wx:else>🍽️ 点餐订单</text>
         </view>
-        <view class="print-status" wx:if="{{item.printStatus === 2}}">已打印</view>
-        <view class="print-status pending" wx:elif="{{item.printStatus}}">打印异常</view>
+        <view class="order-status-row">
+          <view class="pay-status {{item.pay_status ? 'paid' : 'unpaid'}}">
+            {{item.pay_status ? '已支付' : '未支付'}}
+          </view>
+          <view class="print-status" wx:if="{{item.printStatus === 2}}">已打印</view>
+          <view class="print-status pending" wx:elif="{{item.printStatus}}">打印异常</view>
+        </view>
       </view>
 
       <view class="order-content">

@@ -37,6 +37,28 @@
   border-radius: 8rpx;
 }
 
+.order-status-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.pay-status {
+  font-size: 24rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 20rpx;
+}
+
+.pay-status.paid {
+  color: #07c160;
+  background: rgba(7, 193, 96, 0.1);
+}
+
+.pay-status.unpaid {
+  color: #ff976a;
+  background: rgba(255, 151, 106, 0.1);
+}
+
 .print-status {
   font-size: 24rpx;
   color: #07c160;

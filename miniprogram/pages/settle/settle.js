@@ -1,6 +1,8 @@
 // pages/settle/settle.js
 const { formatTagLabelSuffix } = require('../../utils/price.js')
 const PACKAGING_FEE = 1
+const TABLE_OPTIONS = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6']
+const TABLE_PICKER_OPTIONS = ['不选', ...TABLE_OPTIONS]
 
 Page({
   data: {
@@ -9,8 +11,11 @@ Page({
     finalPrice: 0,
     packagingFee: 0,
     orderType: 'dineIn',
+    tablePickerOptions: TABLE_PICKER_OPTIONS,
+    tablePickerIndex: 0,
     tableNumber: '',
     remark: '',
+    payStatus: false,
     submitting: false,
     canSubmit: false
   },
@@ -88,12 +93,16 @@ Page({
       const totalPrice = Number(cartData.totalPrice) || 0
       const orderType = cartData.orderType || 'dineIn'
       const packagingFee = orderType === 'takeOut' ? PACKAGING_FEE : 0
+      const rawTableNumber = (cartData.tableNumber || '').trim()
+      const tableNumber = TABLE_OPTIONS.includes(rawTableNumber) ? rawTableNumber : ''
+      const tablePickerIndex = tableNumber ? TABLE_PICKER_OPTIONS.indexOf(tableNumber) : 0
       this.setData({
         orderGoods: goodsList,
         totalPrice,
         packagingFee,
         finalPrice: totalPrice + packagingFee,
-        tableNumber: cartData.tableNumber || '',
+        tableNumber,
+        tablePickerIndex: tablePickerIndex >= 0 ? tablePickerIndex : 0,
         orderType,
         remark: cartData.remark || ''
       })
@@ -117,13 +126,22 @@ Page({
     })
   },
 
-  onTableNumberInput(e) {
-    this.setData({ tableNumber: e.detail.value.trim() })
-    this.updateCanSubmit()
+  onTableNumberChange(e) {
+    const index = Number(e.detail.value)
+    const tableNumber = index > 0 && TABLE_PICKER_OPTIONS[index] ? TABLE_PICKER_OPTIONS[index] : ''
+    this.setData({
+      tablePickerIndex: index,
+      tableNumber: TABLE_OPTIONS.includes(tableNumber) ? tableNumber : ''
+    })
   },
 
   onRemarkInput(e) {
     this.setData({ remark: e.detail.value })
+  },
+
+  selectPayStatus(e) {
+    const paid = e.currentTarget.dataset.value === 'true'
+    this.setData({ payStatus: paid })
   },
 
   updateCanSubmit() {
@@ -154,7 +172,8 @@ Page({
           packagingFee: this.data.packagingFee,
           tableNumber: this.data.tableNumber,
           orderType: this.data.orderType,
-          remark: this.data.remark
+          remark: this.data.remark,
+          pay_status: this.data.payStatus
         }
       })
 

@@ -327,6 +327,20 @@ Page({
     return result
   },
 
+  async deleteCategoryViaCloud(categoryId) {
+    const res = await wx.cloud.callFunction({
+      name: 'deleteCategory',
+      data: { categoryId }
+    })
+    const result = res.result || {}
+    if (!result.success) {
+      const error = new Error(result.message || '删除分类失败')
+      error.code = result.code
+      throw error
+    }
+    return result
+  },
+
   async removeDishesInCategory(categoryId) {
     const pageSize = 20
     let hasMore = true
@@ -367,13 +381,18 @@ Page({
       dishCount = countRes.total || 0
     } catch (err) {
       console.error('统计分类菜品失败', err)
+      wx.showToast({
+        title: '无法统计分类下菜品，请稍后重试',
+        icon: 'none'
+      })
+      return
     }
 
     wx.showModal({
       title: '确认删除',
       content: dishCount > 0
-        ? `分类「${categoryName}」下有 ${dishCount} 个菜品，删除分类将同时删除这些菜品，是否继续？`
-        : `确定要删除分类「${categoryName}」吗？`,
+        ? `分类「${categoryName}」下有 ${dishCount} 个菜品，删除分类将同时删除这些菜品，并清理其他菜品中的分类标签引用，是否继续？`
+        : `确定要删除分类「${categoryName}」吗？将同时清理其他菜品中的分类标签引用。`,
       success: async (res) => {
         if (!res.confirm) return
 
@@ -391,15 +410,12 @@ Page({
             return
           }
 
-          if (dishCount > 0) {
-            await this.removeDishesInCategory(categoryId)
-          }
-          await this.removeCategoryRefTags(categoryId)
-          await db.collection('dishCategory').doc(categoryId).remove()
+          const deleteResult = await this.deleteCategoryViaCloud(categoryId)
 
           wx.hideLoading()
+          const softDeleted = deleteResult.dishesSoftDeleted || 0
           wx.showToast({
-            title: '删除成功',
+            title: softDeleted > 0 ? '分类已删除（部分菜品已标记删除）' : '删除成功',
             icon: 'success'
           })
 
@@ -411,13 +427,20 @@ Page({
           }
 
           this.loadCategories()
+          this.loadAllDishesForOptions()
         } catch (err) {
           wx.hideLoading()
           console.error('删除分类失败', categoryId, err)
+          const message = (err && err.code === 'NOT_FOUND')
+            ? '分类已不存在，已刷新列表'
+            : formatRemoveError(err, '分类')
           wx.showToast({
-            title: formatRemoveError(err, '分类'),
+            title: message,
             icon: 'none'
           })
+          if (err && (err.code === 'NOT_FOUND' || err.code === 'REMOVE_FAILED')) {
+            this.loadCategories()
+          }
         }
       }
     })

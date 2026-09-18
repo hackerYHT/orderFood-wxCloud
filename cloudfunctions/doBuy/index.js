@@ -179,6 +179,8 @@ function generatePrintContent(order, ticketType = 'front') {
   }
   const finalPrice = (order.finalPrice || 0).toFixed(2)
   content += `<RIGHT><font# bolder=1 height=2 width=2>合计  ￥${finalPrice}</font#></RIGHT><BR>`
+  const payStatusText = order.pay_status ? '已付' : '未付'
+  content += `<LEFT>支付状态: ${payStatusText}</LEFT><BR>`
   if (!isKitchen) {
     content += `<LEFT>订单来源: 店员口头点餐</LEFT><BR>`
   }
@@ -264,7 +266,8 @@ exports.main = async (event, context) => {
     totalPrice,
     tableNumber,
     orderType,
-    remark
+    remark,
+    pay_status
   } = event
 
   try {
@@ -282,7 +285,7 @@ exports.main = async (event, context) => {
       packagingFee,
       finalPrice: orderFinal,
       orderType: finalOrderType,
-      pay_status: true,
+      pay_status: pay_status === true,
       source: 'staff_verbal',
       remark: remark || '',
       createTime: db.serverDate(),
