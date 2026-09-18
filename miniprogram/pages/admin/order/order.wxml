@@ -26,6 +26,7 @@
           </view>
         </view>
         <view class="order-type">
+          <text class="queue-number" wx:if="{{item.queueNumber}}">#{{item.queueNumber}}</text>
           <text wx:if="{{item.type === 'recharge'}}">💰 充值订单</text>
           <text wx:elif="{{item.orderType === 'dineIn'}}">🍽️ 堂食订单</text>
           <text wx:elif="{{item.orderType === 'takeOut'}}">📦 打包订单</text>

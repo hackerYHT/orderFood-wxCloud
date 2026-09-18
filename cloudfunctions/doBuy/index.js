@@ -49,6 +49,57 @@ const formatDate = (d) => {
   return `${beijingTime.getUTCFullYear()}-${pad(beijingTime.getUTCMonth() + 1)}-${pad(beijingTime.getUTCDate())} ${pad(beijingTime.getUTCHours())}:${pad(beijingTime.getUTCMinutes())}`
 }
 
+const getBeijingDateKey = (date = new Date()) => {
+  const beijingTime = new Date(date.getTime() + 8 * 60 * 60 * 1000)
+  const pad = (n) => (n < 10 ? '0' + n : n)
+  return `${beijingTime.getUTCFullYear()}-${pad(beijingTime.getUTCMonth() + 1)}-${pad(beijingTime.getUTCDate())}`
+}
+
+const formatQueueNumber = (seq) => String(seq).padStart(3, '0')
+
+const isMissingDocError = (err) => {
+  const msg = String((err && err.message) || err || '')
+  return msg.includes('does not exist') || msg.includes('document.get:fail')
+}
+
+async function getNextQueueNumber() {
+  const queueDate = getBeijingDateKey()
+  // 计数器文档存放在已有 order 集合，避免单独创建 queueCounter 集合
+  const counterId = `queueCounter_${queueDate}`
+
+  const result = await db.runTransaction(async (transaction) => {
+    const counterRef = transaction.collection('order').doc(counterId)
+    let docRes = null
+
+    try {
+      docRes = await counterRef.get()
+    } catch (err) {
+      // 当天首单时计数器文档尚不存在，get 会抛错而非返回空 data
+      if (!isMissingDocError(err)) {
+        throw err
+      }
+    }
+
+    if (docRes && docRes.data) {
+      const seq = (docRes.data.seq || 0) + 1
+      await counterRef.update({
+        data: { seq }
+      })
+      return seq
+    }
+
+    await counterRef.set({
+      data: { type: 'queueCounter', seq: 1, queueDate }
+    })
+    return 1
+  })
+
+  return {
+    queueDate,
+    queueNumber: formatQueueNumber(result)
+  }
+}
+
 const TAG_PRICE_SUFFIX = /\s\+(\d+(?:\.\d+)?)元$/
 
 const getItemBasePrice = (item) => {
@@ -76,16 +127,15 @@ function generatePrintContent(order, ticketType = 'front') {
   const date = getOrderDate(order)
 
   let content = ''
-  if (isKitchen) {
-    content += `<C><font# bolder=1 height=2 width=2>后厨</font#></C><BR>`
-    content += `<C><font# bolder=1 height=2 width=2>${orderTypeText}</font#></C><BR>`
-  } else {
-    content += `<C><font# bolder=1 height=2 width=2>前台·${orderTypeText}订单</font#></C><BR>`
+  if (order.queueNumber) {
+    content += `<C><font# bolder=1 height=2 width=2>取餐号</font#></C><BR>`
+    content += `<C><font# bolder=1 height=3 width=2>#${escapeHtml(order.queueNumber)}</font#></C><BR>`
+    content += `<C>--------------------------------</C><BR>`
   }
+  const ticketLabel = isKitchen ? '后厨' : '前台'
+  content += `<C><font# bolder=1 height=2 width=2>${ticketLabel}·${orderTypeText}订单</font#></C><BR>`
   content += `<C><font# bolder=1 height=2 width=2>${SHOP_NAME}</font#></C><BR>`
   content += `<C>--------------------------------</C><BR>`
-  content += `<LEFT>订单编号: ${escapeHtml(order._id)}</LEFT><BR>`
-  content += `<LEFT>下单时间: ${formatDate(date)}</LEFT><BR>`
 
   if (order.tableNumber) {
     content += `<C><font# bolder=1 height=2 width=2>桌码: ${escapeHtml(order.tableNumber)}</font#></C><BR>`
@@ -106,10 +156,8 @@ function generatePrintContent(order, ticketType = 'front') {
       const dishName = escapeHtml(item.dishName || item.goodsName || '未知菜品')
       const count = item.count || 1
       const basePrice = getItemBasePrice(item)
-      const rightPart = isKitchen
-        ? `×${count}`
-        : `×${count}  ￥${basePrice.toFixed(2)}`
-      content += appendAlignedLine(dishName, rightPart, 2)
+      const rightPart = `×${count}  ￥${basePrice.toFixed(2)}`
+      content += appendAlignedLine(dishName, rightPart, 3)
 
       if (item.tags && Array.isArray(item.tags) && item.tags.length > 0) {
         item.tags.forEach(tagStr => {
@@ -117,12 +165,8 @@ function generatePrintContent(order, ticketType = 'front') {
           const priceMatch = raw.match(TAG_PRICE_SUFFIX)
           const tagPrice = priceMatch ? parseFloat(priceMatch[1]) : 0
           const tagLabel = escapeHtml(priceMatch ? raw.slice(0, priceMatch.index).trim() : raw)
-          if (isKitchen) {
-            content += appendAlignedLine(`  ${tagLabel}`, '', 1)
-          } else {
-            const tagRight = tagPrice > 0 ? `  ￥${tagPrice.toFixed(2)}` : ''
-            content += appendAlignedLine(`  ${tagLabel}`, tagRight, 1)
-          }
+          const tagRight = tagPrice > 0 ? `  ￥${tagPrice.toFixed(2)}` : ''
+          content += appendAlignedLine(`  ${tagLabel}`, tagRight, 2)
         })
       }
     })
@@ -131,17 +175,15 @@ function generatePrintContent(order, ticketType = 'front') {
   content += `<C>--------------------------------</C><BR>`
   const packagingFee = Number(order.packagingFee) || 0
   if (packagingFee > 0) {
-    if (isKitchen) {
-      content += `<LEFT><font# bolder=0 height=2 width=1>打包费</font#></LEFT><BR>`
-    } else {
-      content += `<RIGHT><font# bolder=0 height=1 width=1>打包费  ￥${packagingFee.toFixed(2)}</font#></RIGHT><BR>`
-    }
+    content += `<RIGHT><font# bolder=0 height=1 width=1>打包费  ￥${packagingFee.toFixed(2)}</font#></RIGHT><BR>`
   }
+  const finalPrice = (order.finalPrice || 0).toFixed(2)
+  content += `<RIGHT><font# bolder=1 height=2 width=2>合计  ￥${finalPrice}</font#></RIGHT><BR>`
   if (!isKitchen) {
-    const finalPrice = (order.finalPrice || 0).toFixed(2)
-    content += `<RIGHT><font# bolder=0 height=1 width=1>合计  ￥${finalPrice}</font#></RIGHT><BR>`
     content += `<LEFT>订单来源: 店员口头点餐</LEFT><BR>`
   }
+  content += `<LEFT>订单编号: ${escapeHtml(order._id)}</LEFT><BR>`
+  content += `<LEFT>下单时间: ${formatDate(date)}</LEFT><BR>`
   content += `<C>**************<font# bolder=1 height=2 width=1>完</font#><font# bolder=0 height=1 width=1>**************</font#></C><BR>`
   return content
 }
@@ -231,6 +273,7 @@ exports.main = async (event, context) => {
     const orderTotal = Number(totalPrice) || 0
     const packagingFee = finalOrderType === 'takeOut' ? PACKAGING_FEE : 0
     const orderFinal = orderTotal + packagingFee
+    const { queueDate, queueNumber } = await getNextQueueNumber()
 
     const orderData = {
       type: 'order',
@@ -244,7 +287,9 @@ exports.main = async (event, context) => {
       remark: remark || '',
       createTime: db.serverDate(),
       _openid: openid,
-      tableNumber: tableNumber || ''
+      tableNumber: tableNumber || '',
+      queueDate,
+      queueNumber
     }
 
     const orderRes = await db.collection('order').add({
@@ -263,6 +308,7 @@ exports.main = async (event, context) => {
     return {
       success: true,
       orderId,
+      queueNumber,
       printed: printResult.printed === true,
       printReason: printResult.reason || '',
       printError: printResult.printError || ''

@@ -1,5 +1,6 @@
 // pages/admin/dish/dish.js
 const db = wx.cloud.database()
+const { getCloudImageUrl, resolveCloudImageUrls } = require('../../../utils/cloudImage.js')
 
 Page({
   data: {
@@ -290,7 +291,8 @@ Page({
         .get()
       
       const list = res.data || []
-      const newDishes = append ? this.data.dishes.concat(list) : list
+      const mergedDishes = append ? this.data.dishes.concat(list) : list
+      const newDishes = await resolveCloudImageUrls(mergedDishes)
       const hasMore = list.length === pageSize
 
       this.setData({
@@ -336,8 +338,9 @@ Page({
         page += 1
       }
 
+      const resolvedDishes = await resolveCloudImageUrls(allDishes)
       this.setData({
-        allDishesForOptions: this.buildOptionDishList(allDishes, this.data.currentTag.options)
+        allDishesForOptions: this.buildOptionDishList(resolvedDishes, this.data.currentTag.options)
       })
     } catch (err) {
       console.error('加载标签选项菜品失败', err)
@@ -353,6 +356,7 @@ Page({
       name: dish.name,
       price: Number(dish.price) || 0,
       image: dish.image || '',
+      imageUrl: dish.imageUrl || dish.image || '',
       categoryName: dish.categoryName || '',
       optionSelected: selectedDishIds.includes(dish._id),
       optionDisabled: !!currentDishId && dish._id === currentDishId
@@ -363,6 +367,54 @@ Page({
     if (!option) return ''
     if (typeof option === 'string') return ''
     return option.dishId || option._id || ''
+  },
+
+  async propagateDishToTagOptions(dishId, dishInfo) {
+    if (!dishId) return
+
+    const name = dishInfo.name || ''
+    const price = Number(dishInfo.price) || 0
+    const image = dishInfo.image || ''
+    const pageSize = 20
+    let page = 0
+    let hasMore = true
+
+    while (hasMore) {
+      const res = await db.collection('dish')
+        .skip(page * pageSize)
+        .limit(pageSize)
+        .get()
+      const list = res.data || []
+
+      for (const dish of list) {
+        if (!dish.tags || !dish.tags.length) continue
+
+        let changed = false
+        const tags = dish.tags.map(tag => {
+          const options = (tag.options || []).map(option => {
+            const optionDishId = this.getOptionDishId(option)
+            if (optionDishId !== dishId) return option
+            changed = true
+            if (typeof option === 'string') return option
+            return {
+              ...option,
+              dishId: optionDishId,
+              name,
+              price,
+              image
+            }
+          })
+          return { ...tag, options }
+        })
+
+        if (changed) {
+          await db.collection('dish').doc(dish._id).update({ data: { tags } })
+        }
+      }
+
+      hasMore = list.length === pageSize
+      page += 1
+    }
   },
 
   normalizeTagOptions(options = []) {
@@ -441,12 +493,16 @@ Page({
   },
 
   // 显示编辑菜品弹窗
-  showEditDishModal(e) {
+  async showEditDishModal(e) {
     const dish = e.currentTarget.dataset.dish
+    const imageUrl = await getCloudImageUrl(dish.image)
     this.setData({
       showDishModal: true,
       editDishMode: true,
-      currentDish: { ...dish }
+      currentDish: {
+        ...dish,
+        imageUrl: imageUrl || dish.image || ''
+      }
     })
   },
 
@@ -603,8 +659,10 @@ Page({
 
       wx.hideLoading()
 
+      const imageUrl = await getCloudImageUrl(uploadRes.fileID)
       this.setData({
-        'currentDish.image': uploadRes.fileID
+        'currentDish.image': uploadRes.fileID,
+        'currentDish.imageUrl': imageUrl || uploadRes.fileID
       })
 
       wx.showToast({
@@ -744,6 +802,11 @@ Page({
         await db.collection('dish').doc(_id).update({
           data: updateData
         })
+        await this.propagateDishToTagOptions(_id, {
+          name: updateData.name,
+          price: updateData.price,
+          image: updateData.image
+        })
       } else {
         // 添加
         await db.collection('dish').add({
@@ -860,10 +923,14 @@ Page({
       }
       this.loadAllDishesForOptions()
 
+      const imageUrl = await getCloudImageUrl(newDish.image)
       this.setData({
         showDishModal: true,
         editDishMode: true,
-        currentDish: newDish
+        currentDish: {
+          ...newDish,
+          imageUrl: imageUrl || newDish.image || ''
+        }
       })
 
       wx.showToast({
@@ -934,12 +1001,17 @@ Page({
   },
 
   // 显示编辑标签弹窗
-  showEditTagModal(e) {
+  async showEditTagModal(e) {
     const index = e.currentTarget.dataset.index
     const tag = this.data.currentDish.tags[index]
+    const normalizedOptions = this.normalizeTagOptions(tag.options || [])
+    const options = await Promise.all(normalizedOptions.map(async option => ({
+      ...option,
+      imageUrl: await getCloudImageUrl(option.image)
+    })))
     const currentTag = {
       ...JSON.parse(JSON.stringify(tag)),
-      options: this.normalizeTagOptions(tag.options || [])
+      options
     }
     this.setData({
       showTagModal: true,
@@ -1022,6 +1094,7 @@ Page({
         name: dish.name,
         price: Number(dish.price) || 0,
         image: dish.image || '',
+        imageUrl: dish.imageUrl || dish.image || '',
         defaultSelected: false
       })
     }

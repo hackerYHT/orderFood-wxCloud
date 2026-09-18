@@ -164,15 +164,15 @@ Page({
 
       wx.hideLoading()
 
-      const { printed, printReason, printError } = doBuyRes.result
-      let toastTitle = '已提交并打印'
+      const { printed, printReason, printError, queueNumber } = doBuyRes.result
+      let toastTitle = queueNumber ? `取餐号 #${queueNumber}` : '已提交并打印'
       if (!printed) {
         const reasonTitles = {
-          no_printer: '已提交（未绑定打印机）',
-          print_failed: '已提交（打印失败）',
-          print_error: '已提交（打印异常）'
+          no_printer: queueNumber ? `取餐号 #${queueNumber}（未绑定打印机）` : '已提交（未绑定打印机）',
+          print_failed: queueNumber ? `取餐号 #${queueNumber}（打印失败）` : '已提交（打印失败）',
+          print_error: queueNumber ? `取餐号 #${queueNumber}（打印异常）` : '已提交（打印异常）'
         }
-        toastTitle = reasonTitles[printReason] || '已提交（打印未成功）'
+        toastTitle = reasonTitles[printReason] || (queueNumber ? `取餐号 #${queueNumber}（打印未成功）` : '已提交（打印未成功）')
         if (printError && printReason === 'print_failed') {
           console.warn('打印失败详情:', printError)
         }
@@ -180,7 +180,7 @@ Page({
       wx.showToast({
         title: toastTitle,
         icon: printed ? 'success' : 'none',
-        duration: 2000
+        duration: 2500
       })
 
       this.clearCart()

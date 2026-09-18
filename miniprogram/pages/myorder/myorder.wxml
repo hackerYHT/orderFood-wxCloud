@@ -9,6 +9,7 @@
     <view class="order-item" wx:for="{{orderList}}" wx:key="_id">
       <view class="order-header">
         <view class="order-type">
+          <text class="queue-number" wx:if="{{item.queueNumber}}">#{{item.queueNumber}}</text>
           <text wx:if="{{item.orderType === 'dineIn'}}">🍽️ 堂食订单</text>
           <text wx:elif="{{item.orderType === 'takeOut'}}">📦 打包订单</text>
           <text wx:else>🍽️ 点餐订单</text>

@@ -26,6 +26,17 @@
   color: #999;
 }
 
+.queue-number {
+  display: inline-block;
+  margin-right: 12rpx;
+  padding: 4rpx 14rpx;
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #e54d42;
+  background: rgba(229, 77, 66, 0.1);
+  border-radius: 8rpx;
+}
+
 .print-status {
   font-size: 24rpx;
   color: #07c160;

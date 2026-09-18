@@ -47,7 +47,7 @@
       <scroll-view class="dish-list" scroll-y bindscrolltolower="loadMoreDishes" wx:if="{{currentCategoryId}}">
         <view class="dish-item" wx:for="{{dishes}}" wx:key="_id">
           <view class="dish-image">
-            <image wx:if="{{item.image}}" src="{{item.image}}" mode="aspectFill"></image>
+            <image wx:if="{{item.imageUrl || item.image}}" src="{{item.imageUrl || item.image}}" mode="aspectFill"></image>
             <view wx:else class="no-image">暂无图片</view>
             <view class="dish-status {{item.status === 1 ? 'online' : 'offline'}}">
               {{item.status === 1 ? '已上架' : '已下架'}}
@@ -135,7 +135,7 @@
         <view class="form-item">
           <view class="form-label">菜品图片<text class="required-mark">*</text></view>
           <view class="image-upload" bindtap="chooseDishImage">
-            <image wx:if="{{currentDish.image}}" src="{{currentDish.image}}" mode="aspectFill"></image>
+            <image wx:if="{{currentDish.imageUrl || currentDish.image}}" src="{{currentDish.imageUrl || currentDish.image}}" mode="aspectFill"></image>
             <view wx:else class="upload-placeholder">点击上传图片</view>
           </view>
         </view>
@@ -299,7 +299,7 @@
           <view class="option-list">
             <view class="option-item-row" wx:for="{{currentTag.options}}" wx:key="index">
               <view class="option-dish-info">
-                <image class="option-dish-image" wx:if="{{item.image}}" src="{{item.image}}" mode="aspectFill"></image>
+                <image class="option-dish-image" wx:if="{{item.imageUrl || item.image}}" src="{{item.imageUrl || item.image}}" mode="aspectFill"></image>
                 <view class="option-dish-image placeholder" wx:else>无图</view>
                 <view>
                   <view class="option-text">{{item.name || item}}</view>
@@ -321,7 +321,7 @@
               wx:key="_id"
               bindtap="toggleOptionDish"
               data-dish="{{item}}">
-              <image class="dish-option-image" wx:if="{{item.image}}" src="{{item.image}}" mode="aspectFill"></image>
+              <image class="dish-option-image" wx:if="{{item.imageUrl || item.image}}" src="{{item.imageUrl || item.image}}" mode="aspectFill"></image>
               <view class="dish-option-image placeholder" wx:else>无图</view>
               <view class="dish-option-info">
                 <view class="dish-option-name">{{item.name}}</view>

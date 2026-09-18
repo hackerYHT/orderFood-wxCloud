@@ -93,6 +93,17 @@
   font-weight: bold;
 }
 
+.queue-number {
+  display: inline-block;
+  margin-right: 12rpx;
+  padding: 4rpx 14rpx;
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #e54d42;
+  background: rgba(229, 77, 66, 0.1);
+  border-radius: 8rpx;
+}
+
 /* 订单内容 */
 .order-content {
   padding: 30rpx;

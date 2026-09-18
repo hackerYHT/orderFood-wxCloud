@@ -2,6 +2,7 @@
 const app = getApp()
 const db = wx.cloud.database()
 const { formatTagLabelSuffix } = require('../../utils/price.js')
+const { resolveCloudImageUrls } = require('../../utils/cloudImage.js')
 
 Page({
   data: {
@@ -33,6 +34,7 @@ Page({
   },
 
   onLoad(options) {
+    this.dishById = {}
     // 获取状态栏高度
     const systemInfo = wx.getSystemInfoSync()
     this.setData({
@@ -203,13 +205,18 @@ Page({
       // 为每个菜品添加购物车数量
       const list = goodsRes.data || []
       const mapped = list.map(goods => {
+        this.dishById[goods._id] = goods
         const normalized = this.normalizeDishTags(goods)
         normalized.cartCount = this.getDishCartCount(goods._id)
         return normalized
       })
+      const resolved = await resolveCloudImageUrls(mapped)
+      resolved.forEach(goods => {
+        this.dishById[goods._id] = goods
+      })
       
       this.setData({
-        goodsList: append ? this.data.goodsList.concat(mapped) : mapped,
+        goodsList: append ? this.data.goodsList.concat(resolved) : resolved,
         goodsPage: page,
         goodsHasMore: list.length === pageSize
       })
@@ -240,7 +247,34 @@ Page({
 
   getGoodsById(dishId) {
     if (!dishId) return null
+    if (this.dishById && this.dishById[dishId]) {
+      return this.dishById[dishId]
+    }
     return this.data.goodsList.find(item => item._id === dishId) || null
+  },
+
+  async ensureDishLookup(dish) {
+    const missingIdSet = new Set()
+    ;(dish.tags || []).forEach(tag => {
+      ;(tag.options || []).forEach(option => {
+        if (typeof option !== 'object') return
+        const dishId = option.dishId || option._id || ''
+        if (dishId && !this.getGoodsById(dishId)) {
+          missingIdSet.add(dishId)
+        }
+      })
+    })
+
+    const missingIds = [...missingIdSet]
+    if (!missingIds.length) return
+
+    const res = await db.collection('dish').where({
+      _id: db.command.in(missingIds)
+    }).get()
+
+    ;(res.data || []).forEach(item => {
+      this.dishById[item._id] = item
+    })
   },
 
   getGoodsFromEvent(e) {
@@ -249,9 +283,17 @@ Page({
   },
 
   // 添加到购物车 - 显示标签选择弹窗
-  addToCart(e) {
-    const goods = this.normalizeDishTags(this.getGoodsFromEvent(e))
-    if (!goods || !goods._id) return
+  async addToCart(e) {
+    const rawGoods = this.getGoodsFromEvent(e)
+    if (!rawGoods || !rawGoods._id) return
+
+    try {
+      await this.ensureDishLookup(rawGoods)
+    } catch (err) {
+      console.error('加载标签选项菜品失败', err)
+    }
+
+    const goods = this.normalizeDishTags(rawGoods)
     const selectedTags = this.buildDefaultSelectedTags(goods)
     const currentDish = this.updateTagOptionSelectedState(goods, selectedTags)
     
@@ -286,14 +328,16 @@ Page({
       }
     }
 
-    const id = option.id || option.dishId || option._id || option.name || option.dishName
+    const dishId = option.dishId || option._id || ''
+    const id = option.id || dishId || option.name || option.dishName
+    const refDish = dishId ? this.getGoodsById(dishId) : null
     return {
       ...option,
       id,
-      dishId: option.dishId || option._id || '',
-      name: option.name || option.dishName || '',
-      price: Number(option.price) || 0,
-      image: option.image || option.dishImage || '',
+      dishId,
+      name: refDish ? refDish.name : (option.name || option.dishName || ''),
+      price: refDish ? (Number(refDish.price) || 0) : (Number(option.price) || 0),
+      image: refDish ? (refDish.image || '') : (option.image || option.dishImage || ''),
       defaultSelected: option.defaultSelected === true
     }
   },

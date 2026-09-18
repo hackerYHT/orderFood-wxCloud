@@ -35,7 +35,7 @@
     <!-- 右侧菜品列表 -->
     <scroll-view class="goods-list" scroll-y>
       <view class="goods-item" wx:for="{{goodsList}}" wx:key="_id">
-        <image class="goods-image" src="{{item.image}}" mode="aspectFill"></image>
+        <image class="goods-image" src="{{item.imageUrl || item.image}}" mode="aspectFill"></image>
         <view class="goods-info">
           <view class="goods-name">{{item.name}}</view>
           <view class="goods-desc" wx:if="{{item.description || item.desc}}">{{item.description || item.desc}}</view>
@@ -98,7 +98,7 @@
     <scroll-view class="cart-content" scroll-y>
       <view class="cart-goods-item" wx:for="{{cart}}" wx:for-item="item" wx:key="index">
         <view class="cart-goods-info">
-          <image class="cart-goods-image" src="{{item.info.image}}" mode="aspectFill"></image>
+          <image class="cart-goods-image" src="{{item.info.imageUrl || item.info.image}}" mode="aspectFill"></image>
           <view class="cart-goods-detail">
             <view class="cart-goods-name">{{item.info.name}}</view>
             <view class="cart-goods-tags" wx:if="{{item.tagLabels && item.tagLabels.length > 0}}">
@@ -145,7 +145,7 @@
       <scroll-view class="modal-content" scroll-y>
         <!-- 商品信息 -->
         <view class="dish-detail-header">
-          <image class="dish-detail-image" src="{{currentDish.image}}" mode="aspectFill"></image>
+          <image class="dish-detail-image" src="{{currentDish.imageUrl || currentDish.image}}" mode="aspectFill"></image>
           <view class="dish-detail-info">
             <view class="dish-detail-name">{{currentDish.name}}</view>
             <view class="dish-detail-desc" wx:if="{{currentDish.description}}">{{currentDish.description}}</view>
