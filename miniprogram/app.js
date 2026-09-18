@@ -1,4 +1,6 @@
 //app.js
+const { envList } = require('./envList.js')
+
 App({
   onLaunch: async function () {
     if (!wx.cloud) {
@@ -15,6 +17,7 @@ App({
       }
 
       wx.cloud.init({
+        env: envList[0].envId,
         traceUser: true,
       })
       
