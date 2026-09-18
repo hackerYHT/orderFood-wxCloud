@@ -25,6 +25,13 @@ Page({
     })
   },
 
+  // 标签批量管理
+  goToTagBatch() {
+    wx.navigateTo({
+      url: '/pages/admin/tagBatch/tagBatch'
+    })
+  },
+
   // 订单管理
   goToOrder() {
     wx.navigateTo({

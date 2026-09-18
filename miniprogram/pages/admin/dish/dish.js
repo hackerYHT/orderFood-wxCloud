@@ -62,6 +62,12 @@ Page({
     this.loadAllDishesForOptions()
   },
 
+  goToTagBatch() {
+    wx.navigateTo({
+      url: '/pages/admin/tagBatch/tagBatch'
+    })
+  },
+
   onShow() {
     this.loadCategories()
     this.loadDishes()
@@ -971,6 +977,31 @@ Page({
   onTagRequiredChange(e) {
     this.setData({
       'currentTag.required': e.detail.value
+    })
+  },
+
+  // 批量设置标签是否必选
+  batchSetTagsRequired(e) {
+    const raw = e.currentTarget.dataset.required
+    const required = raw === true || raw === 'true'
+    const { currentDish } = this.data
+
+    if (!currentDish.tags || currentDish.tags.length === 0) {
+      return
+    }
+
+    const tags = currentDish.tags.map(tag => ({
+      ...tag,
+      required
+    }))
+
+    this.setData({
+      'currentDish.tags': tags
+    })
+
+    wx.showToast({
+      title: required ? '已全部设为必选' : '已全部设为非必选',
+      icon: 'success'
     })
   },
 

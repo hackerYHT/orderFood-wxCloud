@@ -13,6 +13,12 @@
         bind:click="goToDish"
       />
       <van-grid-item 
+        icon="label-o" 
+        icon-color="#1989fa"
+        text="标签批量管理" 
+        bind:click="goToTagBatch"
+      />
+      <van-grid-item 
         icon="orders-o" 
         icon-color="#07c160"
         text="订单管理" 

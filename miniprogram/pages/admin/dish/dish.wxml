@@ -34,9 +34,12 @@
         <view class="header-title">
           {{currentCategoryId ? '菜品管理' : '请选择分类'}}
         </view>
-        <view class="add-dish-btn" bindtap="showAddDishModal" wx:if="{{currentCategoryId}}">
-          <text class="add-icon">+</text>
-          <text>添加菜品</text>
+        <view class="header-actions">
+          <view class="tag-batch-link" bindtap="goToTagBatch">标签批量</view>
+          <view class="add-dish-btn" bindtap="showAddDishModal" wx:if="{{currentCategoryId}}">
+            <text class="add-icon">+</text>
+            <text>添加菜品</text>
+          </view>
         </view>
       </view>
 
@@ -191,6 +194,10 @@
             <text class="label-tip">（用户点餐时可选择）</text>
           </view>
           <view class="tags-management">
+            <view class="tag-batch-actions" wx:if="{{currentDish.tags.length > 0}}">
+              <text class="tag-batch-btn" bindtap="batchSetTagsRequired" data-required="{{true}}">全部设为必选</text>
+              <text class="tag-batch-btn outline" bindtap="batchSetTagsRequired" data-required="{{false}}">全部设为非必选</text>
+            </view>
             <view class="tag-list" wx:if="{{currentDish.tags.length > 0}}">
               <view class="tag-card" wx:for="{{currentDish.tags}}" wx:key="id">
                 <view class="tag-card-header">

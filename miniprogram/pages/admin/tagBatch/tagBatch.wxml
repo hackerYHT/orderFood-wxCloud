@@ -1,0 +1,92 @@
+<!--pages/admin/tagBatch/tagBatch.wxml-->
+<view class="page">
+  <view class="tip-bar">
+    <text class="tip-icon">ℹ️</text>
+    <text class="tip-text">选择同名标签，可批量修改所有菜品中该标签的「是否必选」和「单选/多选」</text>
+  </view>
+
+  <view class="loading-tip" wx:if="{{loading}}">加载中...</view>
+
+  <view class="tag-list" wx:if="{{!loading}}">
+    <view
+      class="tag-stat-card"
+      wx:for="{{tagStats}}"
+      wx:key="name"
+      bindtap="openBatchEdit"
+      data-name="{{item.name}}">
+      <view class="tag-stat-header">
+        <text class="tag-stat-name">{{item.name}}</text>
+        <text class="tag-stat-count">{{item.dishCount}} 个菜品</text>
+      </view>
+      <view class="tag-stat-meta">
+        <text class="meta-item">必选 {{item.requiredCount}}</text>
+        <text class="meta-item">非必选 {{item.dishCount - item.requiredCount}}</text>
+        <text class="meta-item">单选 {{item.singleCount}}</text>
+        <text class="meta-item">多选 {{item.multipleCount}}</text>
+      </view>
+      <view class="tag-stat-action">点击批量编辑 →</view>
+    </view>
+
+    <van-empty wx:if="{{tagStats.length === 0}}" description="暂无标签，请先在菜品管理中添加" />
+  </view>
+
+  <!-- 批量编辑弹窗 -->
+  <view class="modal-mask" wx:if="{{showEditModal}}" catchtap="closeEditModal">
+    <view class="modal-dialog" catchtap="stopPropagation">
+      <view class="modal-title">批量编辑「{{selectedTagName}}」</view>
+      <scroll-view class="modal-content" scroll-y>
+        <view class="form-item">
+          <view class="form-label">影响范围</view>
+          <view class="affected-summary">共 {{affectedDishes.length}} 个菜品</view>
+          <view class="affected-list">
+            <view class="affected-item" wx:for="{{affectedDishes}}" wx:key="_id">
+              <text class="affected-dish-name">{{item.dishName}}</text>
+              <text class="affected-category" wx:if="{{item.categoryName}}">{{item.categoryName}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="form-item">
+          <view class="form-label">是否必选</view>
+          <view class="required-quick-actions">
+            <text
+              class="quick-btn {{batchSettings.required ? 'active' : ''}}"
+              bindtap="setBatchRequired"
+              data-required="{{true}}">设为必选</text>
+            <text
+              class="quick-btn outline {{!batchSettings.required ? 'active' : ''}}"
+              bindtap="setBatchRequired"
+              data-required="{{false}}">设为非必选</text>
+          </view>
+          <switch checked="{{batchSettings.required}}" bindchange="onRequiredChange" color="#e54d42"/>
+        </view>
+
+        <view class="form-item">
+          <view class="form-label">选择类型</view>
+          <view class="type-selector">
+            <view
+              class="type-option {{batchSettings.type === 'single' ? 'active' : ''}}"
+              bindtap="selectType"
+              data-type="single">
+              单选
+            </view>
+            <view
+              class="type-option {{batchSettings.type === 'multiple' ? 'active' : ''}}"
+              bindtap="selectType"
+              data-type="multiple">
+              多选
+            </view>
+          </view>
+        </view>
+
+        <view class="form-note">
+          注：各菜品的标签选项内容不会同步修改，仅统一「是否必选」和「单选/多选」设置。
+        </view>
+      </scroll-view>
+      <view class="modal-footer">
+        <view class="modal-btn cancel" bindtap="closeEditModal">取消</view>
+        <view class="modal-btn confirm" bindtap="applyBatchUpdate">应用到全部</view>
+      </view>
+    </view>
+  </view>
+</view>

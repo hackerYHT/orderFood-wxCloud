@@ -111,6 +111,21 @@
   color: #333;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 15rpx;
+}
+
+.tag-batch-link {
+  padding: 12rpx 20rpx;
+  font-size: 24rpx;
+  color: #1989fa;
+  border: 2rpx solid #1989fa;
+  border-radius: 50rpx;
+  background: white;
+}
+
 .add-dish-btn {
   padding: 15rpx 30rpx;
   background: linear-gradient(135deg, #e54d42 0%, #f37370 100%);
@@ -498,6 +513,28 @@
 /* ==================== 标签管理样式 ==================== */
 .tags-management {
   margin-top: 10rpx;
+}
+
+.tag-batch-actions {
+  display: flex;
+  gap: 15rpx;
+  margin-bottom: 15rpx;
+}
+
+.tag-batch-btn {
+  flex: 1;
+  padding: 16rpx;
+  text-align: center;
+  font-size: 24rpx;
+  border-radius: 8rpx;
+  background: linear-gradient(135deg, #e54d42 0%, #f37370 100%);
+  color: white;
+}
+
+.tag-batch-btn.outline {
+  background: white;
+  color: #e54d42;
+  border: 2rpx solid #e54d42;
 }
 
 .tag-list {
