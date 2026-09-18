@@ -1,6 +1,8 @@
 // pages/admin/dish/dish.js
 const db = wx.cloud.database()
 const { getCloudImageUrl, resolveCloudImageUrls } = require('../../../utils/cloudImage.js')
+const { isCategoryRefTag, removeTagByKey, getTagRemoveKey } = require('../../../utils/dishTags.js')
+const { formatRemoveError } = require('../../../utils/dbError.js')
 
 Page({
   data: {
@@ -218,43 +220,204 @@ Page({
     }
   },
 
+  resolveDatasetId(e, objectKey = '') {
+    const dataset = e.currentTarget.dataset || {}
+    if (dataset.id) return dataset.id
+    if (objectKey && dataset[objectKey] && dataset[objectKey]._id) {
+      return dataset[objectKey]._id
+    }
+    return ''
+  },
+
+  async fetchDocument(collectionName, docId) {
+    if (!docId) return null
+    try {
+      const res = await db.collection(collectionName).doc(docId).get()
+      return res.data || null
+    } catch (err) {
+      const message = (err && err.errMsg) || ''
+      if (message.includes('cannot find document') || message.includes('document.get:fail')) {
+        return null
+      }
+      throw err
+    }
+  },
+
+  async removeDishTagReferences(dishId) {
+    if (!dishId) return
+
+    const pageSize = 20
+    let page = 0
+    let hasMore = true
+
+    while (hasMore) {
+      const res = await db.collection('dish')
+        .skip(page * pageSize)
+        .limit(pageSize)
+        .get()
+      const list = res.data || []
+
+      for (const dish of list) {
+        if (!dish.tags || !dish.tags.length) continue
+
+        let changed = false
+        const tags = dish.tags.map(tag => {
+          const options = (tag.options || []).filter(option => {
+            const optionDishId = this.getOptionDishId(option)
+            if (optionDishId === dishId) {
+              changed = true
+              return false
+            }
+            return true
+          })
+          return { ...tag, options }
+        })
+
+        if (changed) {
+          await db.collection('dish').doc(dish._id).update({ data: { tags } })
+        }
+      }
+
+      hasMore = list.length === pageSize
+      page += 1
+    }
+  },
+
+  async removeCategoryRefTags(categoryId) {
+    if (!categoryId) return
+
+    const removeKey = getTagRemoveKey({ categoryId, source: 'categoryRef' })
+    const pageSize = 20
+    let page = 0
+    let hasMore = true
+
+    while (hasMore) {
+      const res = await db.collection('dish')
+        .skip(page * pageSize)
+        .limit(pageSize)
+        .get()
+      const list = res.data || []
+
+      for (const dish of list) {
+        const currentTags = Array.isArray(dish.tags) ? dish.tags : []
+        const nextTags = removeTagByKey(currentTags, removeKey)
+        if (nextTags.length === currentTags.length) continue
+
+        await db.collection('dish').doc(dish._id).update({
+          data: { tags: nextTags }
+        })
+      }
+
+      hasMore = list.length === pageSize
+      page += 1
+    }
+  },
+
+  async deleteDishViaCloud(dishId) {
+    const res = await wx.cloud.callFunction({
+      name: 'deleteDish',
+      data: { dishId }
+    })
+    const result = res.result || {}
+    if (!result.success) {
+      const error = new Error(result.message || '删除菜品失败')
+      error.code = result.code
+      throw error
+    }
+    return result
+  },
+
+  async removeDishesInCategory(categoryId) {
+    const pageSize = 20
+    let hasMore = true
+
+    while (hasMore) {
+      const res = await db.collection('dish')
+        .where({ categoryId })
+        .limit(pageSize)
+        .get()
+      const list = res.data || []
+
+      for (const dish of list) {
+        await this.deleteDishViaCloud(dish._id)
+      }
+
+      hasMore = list.length === pageSize
+    }
+  },
+
   // 删除分类
-  deleteCategory(e) {
-    const category = e.currentTarget.dataset.category
+  async deleteCategory(e) {
+    const categoryId = this.resolveDatasetId(e, 'category')
+    const categoryName = e.currentTarget.dataset.name
+      || (e.currentTarget.dataset.category || {}).name
+      || '该分类'
+
+    if (!categoryId) {
+      wx.showToast({
+        title: '分类信息无效，请刷新后重试',
+        icon: 'none'
+      })
+      return
+    }
+
+    let dishCount = 0
+    try {
+      const countRes = await db.collection('dish').where({ categoryId }).count()
+      dishCount = countRes.total || 0
+    } catch (err) {
+      console.error('统计分类菜品失败', err)
+    }
 
     wx.showModal({
       title: '确认删除',
-      content: `确定要删除分类"${category.name}"吗？`,
+      content: dishCount > 0
+        ? `分类「${categoryName}」下有 ${dishCount} 个菜品，删除分类将同时删除这些菜品，是否继续？`
+        : `确定要删除分类「${categoryName}」吗？`,
       success: async (res) => {
-        if (res.confirm) {
-          try {
-            wx.showLoading({ title: '删除中...' })
+        if (!res.confirm) return
 
-            await db.collection('dishCategory').doc(category._id).remove()
+        try {
+          wx.showLoading({ title: '删除中...' })
 
+          const categoryDoc = await this.fetchDocument('dishCategory', categoryId)
+          if (!categoryDoc) {
             wx.hideLoading()
             wx.showToast({
-              title: '删除成功',
-              icon: 'success'
-            })
-
-            // 如果删除的是当前选中的分类，清空选中状态
-            if (this.data.currentCategoryId === category._id) {
-              this.setData({
-                currentCategoryId: '',
-                dishes: []
-              })
-            }
-
-            this.loadCategories()
-          } catch (err) {
-            wx.hideLoading()
-            console.error('删除失败', err)
-            wx.showToast({
-              title: '删除失败',
+              title: '分类已不存在，已刷新列表',
               icon: 'none'
             })
+            this.loadCategories()
+            return
           }
+
+          if (dishCount > 0) {
+            await this.removeDishesInCategory(categoryId)
+          }
+          await this.removeCategoryRefTags(categoryId)
+          await db.collection('dishCategory').doc(categoryId).remove()
+
+          wx.hideLoading()
+          wx.showToast({
+            title: '删除成功',
+            icon: 'success'
+          })
+
+          if (this.data.currentCategoryId === categoryId) {
+            this.setData({
+              currentCategoryId: '',
+              dishes: []
+            })
+          }
+
+          this.loadCategories()
+        } catch (err) {
+          wx.hideLoading()
+          console.error('删除分类失败', categoryId, err)
+          wx.showToast({
+            title: formatRemoveError(err, '分类'),
+            icon: 'none'
+          })
         }
       }
     })
@@ -290,7 +453,7 @@ Page({
         .limit(pageSize)
         .get()
       
-      const list = res.data || []
+      const list = (res.data || []).filter(item => item.deleted !== true)
       const mergedDishes = append ? this.data.dishes.concat(list) : list
       const newDishes = await resolveCloudImageUrls(mergedDishes)
       const hasMore = list.length === pageSize
@@ -332,7 +495,7 @@ Page({
           .skip(page * pageSize)
           .limit(pageSize)
           .get()
-        const list = res.data || []
+        const list = (res.data || []).filter(item => item.deleted !== true)
         allDishes = allDishes.concat(list)
         hasMore = list.length === pageSize
         page += 1
@@ -949,33 +1112,63 @@ Page({
 
   // 删除菜品
   deleteDish(e) {
-    const dish = e.currentTarget.dataset.dish
+    const dishId = this.resolveDatasetId(e, 'dish')
+    const dishName = e.currentTarget.dataset.name
+      || (e.currentTarget.dataset.dish || {}).name
+      || '该菜品'
+
+    if (!dishId) {
+      wx.showToast({
+        title: '菜品信息无效，请刷新后重试',
+        icon: 'none'
+      })
+      return
+    }
 
     wx.showModal({
       title: '确认删除',
-      content: `确定要删除菜品"${dish.name}"吗？`,
+      content: `确定要删除菜品「${dishName}」吗？`,
       success: async (res) => {
-        if (res.confirm) {
-          try {
-            wx.showLoading({ title: '删除中...' })
+        if (!res.confirm) return
 
-            await db.collection('dish').doc(dish._id).remove()
+        try {
+          wx.showLoading({ title: '删除中...' })
 
+          const dishDoc = await this.fetchDocument('dish', dishId)
+          if (!dishDoc || dishDoc.deleted === true) {
             wx.hideLoading()
             wx.showToast({
-              title: '删除成功',
-              icon: 'success'
-            })
-
-            this.loadDishes()
-            this.loadAllDishesForOptions()
-          } catch (err) {
-            wx.hideLoading()
-            console.error('删除失败', err)
-            wx.showToast({
-              title: '删除失败',
+              title: '菜品已不存在，已刷新列表',
               icon: 'none'
             })
+            this.loadDishes()
+            this.loadAllDishesForOptions()
+            return
+          }
+
+          const deleteResult = await this.deleteDishViaCloud(dishId)
+
+          wx.hideLoading()
+          wx.showToast({
+            title: deleteResult.mode === 'soft' ? '已标记删除' : '删除成功',
+            icon: 'success'
+          })
+
+          this.loadDishes()
+          this.loadAllDishesForOptions()
+        } catch (err) {
+          wx.hideLoading()
+          console.error('删除菜品失败', dishId, err)
+          const message = (err && err.code === 'NOT_FOUND')
+            ? '菜品已不存在，已刷新列表'
+            : formatRemoveError(err, '菜品')
+          wx.showToast({
+            title: message,
+            icon: 'none'
+          })
+          if (err && err.code === 'NOT_FOUND') {
+            this.loadDishes()
+            this.loadAllDishesForOptions()
           }
         }
       }
@@ -1004,6 +1197,15 @@ Page({
   async showEditTagModal(e) {
     const index = e.currentTarget.dataset.index
     const tag = this.data.currentDish.tags[index]
+
+    if (isCategoryRefTag(tag)) {
+      wx.showToast({
+        title: '分类动态标签请在「标签批量」中管理',
+        icon: 'none'
+      })
+      return
+    }
+
     const normalizedOptions = this.normalizeTagOptions(tag.options || [])
     const options = await Promise.all(normalizedOptions.map(async option => ({
       ...option,
@@ -1079,18 +1281,19 @@ Page({
 
   // 勾选/取消已有菜品作为标签选项
   toggleOptionDish(e) {
-    const dish = e.currentTarget.dataset.dish
-    if (!dish || dish.optionDisabled) return
+    const dish = e.currentTarget.dataset.dish || {}
+    const dishId = e.currentTarget.dataset.id || dish._id || dish.dishId || ''
+    if (!dishId || dish.optionDisabled) return
 
     const currentTag = JSON.parse(JSON.stringify(this.data.currentTag))
     const options = this.normalizeTagOptions(currentTag.options || [])
-    const index = options.findIndex(option => option.dishId === dish._id)
+    const index = options.findIndex(option => this.getOptionDishId(option) === dishId)
 
     if (index > -1) {
       options.splice(index, 1)
     } else {
       options.push({
-        dishId: dish._id,
+        dishId,
         name: dish.name,
         price: Number(dish.price) || 0,
         image: dish.image || '',
@@ -1129,8 +1332,10 @@ Page({
 
   // 删除选项
   deleteOption(e) {
-    const index = e.currentTarget.dataset.index
-    const { currentTag } = this.data
+    const index = parseInt(e.currentTarget.dataset.index, 10)
+    if (Number.isNaN(index)) return
+
+    const currentTag = JSON.parse(JSON.stringify(this.data.currentTag))
     currentTag.options.splice(index, 1)
     this.setData({
       currentTag,
@@ -1153,7 +1358,7 @@ Page({
     const normalizedTag = this.normalizeDefaultOptionsForTag(currentTag)
     currentTag.options = normalizedTag.options
 
-    if (currentTag.options.length === 0) {
+    if (!isCategoryRefTag(currentTag) && currentTag.options.length === 0) {
       wx.showToast({
         title: '请至少选择一个菜品',
         icon: 'none'

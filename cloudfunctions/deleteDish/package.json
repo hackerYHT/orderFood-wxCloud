@@ -1,0 +1,14 @@
+{
+  "name": "deleteDish",
+  "version": "1.0.0",
+  "description": "删除菜品（清理标签引用后硬删除，失败则软删除）",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.1"
+  }
+}

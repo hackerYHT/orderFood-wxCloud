@@ -1,9 +1,27 @@
 // pages/admin/tagBatch/tagBatch.js
 const db = wx.cloud.database()
+const {
+  isCategoryRefTag,
+  buildCategoryRefTag,
+  getTagRemoveKey,
+  getTagDisplayLabel,
+  mergeTagIntoDish,
+  removeTagByKey
+} = require('../../../utils/dishTags.js')
 
 Page({
   data: {
+    activeTab: 'dishes',
     loading: false,
+    categories: [],
+    filterCategoryOptions: ['全部'],
+    filterCategoryId: '',
+    filterCategoryIndex: 0,
+    allDishes: [],
+    displayDishes: [],
+    selectedDishIds: [],
+    selectAll: false,
+
     tagStats: [],
     selectedTagName: '',
     showEditModal: false,
@@ -12,28 +30,63 @@ Page({
       type: 'single'
     },
     affectedDishes: [],
-    applying: false
+    applying: false,
+
+    showAddCategoryTagModal: false,
+    addTagForm: {
+      categoryIndex: 0,
+      categoryId: '',
+      name: '',
+      type: 'single',
+      required: true
+    },
+
+    showRemoveTagModal: false,
+    removableTags: [],
+    selectedRemoveKey: ''
   },
 
   onLoad() {
-    this.loadAllDishesAndTags()
+    this.loadPageData()
   },
 
   onShow() {
-    this.loadAllDishesAndTags()
+    this.loadPageData()
   },
 
-  async loadAllDishesAndTags() {
+  switchTab(e) {
+    const tab = e.currentTarget.dataset.tab
+    this.setData({ activeTab: tab })
+  },
+
+  async loadPageData() {
     if (this.data.loading) return
 
     this.setData({ loading: true })
 
     try {
-      const allDishes = await this.fetchAllDishes()
+      const [categories, allDishes] = await Promise.all([
+        this.fetchCategories(),
+        this.fetchAllDishes()
+      ])
       const tagStats = this.buildTagStats(allDishes)
-      this.setData({ tagStats })
+      const filterCategoryId = this.data.filterCategoryId || ''
+      const filterCategoryIndex = filterCategoryId
+        ? categories.findIndex(item => item._id === filterCategoryId) + 1
+        : 0
+
+      this.setData({
+        categories,
+        filterCategoryOptions: ['全部', ...categories.map(item => item.name)],
+        allDishes,
+        filterCategoryId,
+        filterCategoryIndex: filterCategoryIndex >= 0 ? filterCategoryIndex : 0,
+        tagStats
+      }, () => {
+        this.refreshDisplayDishes()
+      })
     } catch (err) {
-      console.error('加载标签数据失败', err)
+      console.error('加载数据失败', err)
       wx.showToast({
         title: '加载失败',
         icon: 'none'
@@ -41,6 +94,14 @@ Page({
     } finally {
       this.setData({ loading: false })
     }
+  },
+
+  async fetchCategories() {
+    const res = await wx.cloud.callFunction({
+      name: 'getCategory'
+    })
+    const result = res.result || {}
+    return result.success ? (result.data || []) : []
   },
 
   async fetchAllDishes() {
@@ -64,17 +125,92 @@ Page({
     return allDishes
   },
 
+  refreshDisplayDishes() {
+    const { allDishes, filterCategoryId, selectedDishIds } = this.data
+    const displayDishes = allDishes
+      .filter(dish => !filterCategoryId || dish.categoryId === filterCategoryId)
+      .map(dish => ({
+        ...dish,
+        selected: selectedDishIds.includes(dish._id),
+        tagCount: (dish.tags || []).length
+      }))
+    const visibleIds = displayDishes.map(item => item._id)
+    const selectedVisibleCount = visibleIds.filter(id => selectedDishIds.includes(id)).length
+
+    this.setData({
+      displayDishes,
+      selectAll: visibleIds.length > 0 && selectedVisibleCount === visibleIds.length
+    })
+  },
+
+  onFilterCategoryChange(e) {
+    const index = parseInt(e.detail.value, 10)
+    const category = index > 0 ? this.data.categories[index - 1] : null
+    this.setData({
+      filterCategoryIndex: index,
+      filterCategoryId: category ? category._id : ''
+    }, () => {
+      this.refreshDisplayDishes()
+    })
+  },
+
+  toggleDishSelect(e) {
+    const dishId = e.currentTarget.dataset.id
+    const selectedDishIds = [...this.data.selectedDishIds]
+    const index = selectedDishIds.indexOf(dishId)
+
+    if (index > -1) {
+      selectedDishIds.splice(index, 1)
+    } else {
+      selectedDishIds.push(dishId)
+    }
+
+    this.setData({ selectedDishIds }, () => {
+      this.refreshDisplayDishes()
+    })
+  },
+
+  toggleSelectAll() {
+    const { displayDishes, selectAll, selectedDishIds } = this.data
+    const visibleIds = displayDishes.map(item => item._id)
+    let nextSelected = [...selectedDishIds]
+
+    if (selectAll) {
+      nextSelected = nextSelected.filter(id => !visibleIds.includes(id))
+    } else {
+      visibleIds.forEach(id => {
+        if (!nextSelected.includes(id)) {
+          nextSelected.push(id)
+        }
+      })
+    }
+
+    this.setData({ selectedDishIds: nextSelected }, () => {
+      this.refreshDisplayDishes()
+    })
+  },
+
+  clearSelection() {
+    this.setData({ selectedDishIds: [] }, () => {
+      this.refreshDisplayDishes()
+    })
+  },
+
   buildTagStats(dishes) {
     const tagMap = {}
 
     dishes.forEach(dish => {
       (dish.tags || []).forEach(tag => {
-        const name = (tag.name || '').trim()
-        if (!name) return
+        const removeKey = getTagRemoveKey(tag)
+        if (!removeKey) return
 
-        if (!tagMap[name]) {
-          tagMap[name] = {
-            name,
+        if (!tagMap[removeKey]) {
+          tagMap[removeKey] = {
+            removeKey,
+            name: getTagDisplayLabel(tag),
+            rawName: tag.name || '',
+            isCategoryRef: isCategoryRefTag(tag),
+            categoryId: tag.categoryId || '',
             dishCount: 0,
             requiredCount: 0,
             singleCount: 0,
@@ -83,7 +219,7 @@ Page({
           }
         }
 
-        const stat = tagMap[name]
+        const stat = tagMap[removeKey]
         stat.dishCount += 1
         if (tag.required) stat.requiredCount += 1
         if (tag.type === 'multiple') stat.multipleCount += 1
@@ -100,21 +236,267 @@ Page({
     return Object.values(tagMap).sort((a, b) => b.dishCount - a.dishCount)
   },
 
+  buildRemovableTagsFromSelection() {
+    const selectedSet = new Set(this.data.selectedDishIds)
+    const tagMap = {}
+
+    this.data.allDishes.forEach(dish => {
+      if (!selectedSet.has(dish._id)) return
+      ;(dish.tags || []).forEach(tag => {
+        const removeKey = getTagRemoveKey(tag)
+        if (!removeKey) return
+        if (!tagMap[removeKey]) {
+          tagMap[removeKey] = {
+            removeKey,
+            label: getTagDisplayLabel(tag),
+            count: 0
+          }
+        }
+        tagMap[removeKey].count += 1
+      })
+    })
+
+    return Object.values(tagMap).sort((a, b) => b.count - a.count)
+  },
+
+  openAddCategoryTagModal() {
+    if (this.data.selectedDishIds.length === 0) {
+      wx.showToast({
+        title: '请先选择菜品',
+        icon: 'none'
+      })
+      return
+    }
+
+    const { categories } = this.data
+    const categoryIndex = 0
+    const category = categories[categoryIndex]
+
+    this.setData({
+      showAddCategoryTagModal: true,
+      addTagForm: {
+        categoryIndex,
+        categoryId: category ? category._id : '',
+        name: category ? category.name : '',
+        type: 'single',
+        required: true
+      }
+    })
+  },
+
+  closeAddCategoryTagModal() {
+    this.setData({ showAddCategoryTagModal: false })
+  },
+
+  onAddTagCategoryChange(e) {
+    const index = parseInt(e.detail.value, 10)
+    const category = this.data.categories[index]
+    this.setData({
+      'addTagForm.categoryIndex': index,
+      'addTagForm.categoryId': category ? category._id : '',
+      'addTagForm.name': category ? category.name : ''
+    })
+  },
+
+  onAddTagNameInput(e) {
+    this.setData({
+      'addTagForm.name': e.detail.value
+    })
+  },
+
+  setAddTagRequired(e) {
+    const raw = e.currentTarget.dataset.required
+    const required = raw === true || raw === 'true'
+    this.setData({
+      'addTagForm.required': required
+    })
+  },
+
+  selectAddTagType(e) {
+    const type = e.currentTarget.dataset.type
+    this.setData({
+      'addTagForm.type': type
+    })
+  },
+
+  async confirmAddCategoryTag() {
+    const { selectedDishIds, addTagForm, applying } = this.data
+    if (!selectedDishIds.length || applying) return
+
+    const category = this.data.categories[addTagForm.categoryIndex]
+    if (!category || !category._id) {
+      wx.showToast({
+        title: '请选择分类',
+        icon: 'none'
+      })
+      return
+    }
+
+    const tagName = (addTagForm.name || category.name || '').trim()
+    if (!tagName) {
+      wx.showToast({
+        title: '请输入标签名称',
+        icon: 'none'
+      })
+      return
+    }
+
+    const newTag = buildCategoryRefTag({
+      categoryId: category._id,
+      categoryName: category.name,
+      name: tagName,
+      type: addTagForm.type,
+      required: addTagForm.required
+    })
+
+    wx.showModal({
+      title: '确认添加分类标签',
+      content: `将为 ${selectedDishIds.length} 个菜品添加「${tagName}」标签，选项将动态引用「${category.name}」分类下的菜品`,
+      success: async (res) => {
+        if (!res.confirm) return
+        await this.applyTagsToSelectedDishes(selectedDishIds, newTag, 'add')
+      }
+    })
+  },
+
+  openRemoveTagModal() {
+    if (this.data.selectedDishIds.length === 0) {
+      wx.showToast({
+        title: '请先选择菜品',
+        icon: 'none'
+      })
+      return
+    }
+
+    const removableTags = this.buildRemovableTagsFromSelection()
+    if (!removableTags.length) {
+      wx.showToast({
+        title: '所选菜品暂无标签',
+        icon: 'none'
+      })
+      return
+    }
+
+    this.setData({
+      showRemoveTagModal: true,
+      removableTags,
+      selectedRemoveKey: removableTags[0].removeKey
+    })
+  },
+
+  closeRemoveTagModal() {
+    this.setData({ showRemoveTagModal: false })
+  },
+
+  selectRemoveTag(e) {
+    const removeKey = e.currentTarget.dataset.key
+    this.setData({ selectedRemoveKey: removeKey })
+  },
+
+  async confirmRemoveTag() {
+    const { selectedDishIds, selectedRemoveKey, applying } = this.data
+    if (!selectedDishIds.length || !selectedRemoveKey || applying) return
+
+    const targetTag = this.data.removableTags.find(item => item.removeKey === selectedRemoveKey)
+    const label = targetTag ? targetTag.label : '所选标签'
+
+    wx.showModal({
+      title: '确认移除标签',
+      content: `将从 ${selectedDishIds.length} 个菜品中移除「${label}」`,
+      success: async (res) => {
+        if (!res.confirm) return
+        await this.applyTagsToSelectedDishes(selectedDishIds, selectedRemoveKey, 'remove')
+      }
+    })
+  },
+
+  async applyTagsToSelectedDishes(dishIds, payload, mode) {
+    this.setData({ applying: true })
+    wx.showLoading({ title: mode === 'add' ? '添加中...' : '移除中...' })
+
+    let successCount = 0
+    let failCount = 0
+
+    try {
+      for (const dishId of dishIds) {
+        try {
+          const dishRes = await db.collection('dish').doc(dishId).get()
+          const dish = dishRes.data
+          if (!dish) {
+            failCount += 1
+            continue
+          }
+
+          const currentTags = Array.isArray(dish.tags) ? dish.tags : []
+          const nextTags = mode === 'add'
+            ? mergeTagIntoDish(currentTags, payload)
+            : removeTagByKey(currentTags, payload)
+
+          if (JSON.stringify(currentTags) === JSON.stringify(nextTags)) {
+            continue
+          }
+
+          await db.collection('dish').doc(dishId).update({
+            data: { tags: nextTags }
+          })
+          successCount += 1
+        } catch (err) {
+          console.error('更新菜品标签失败', dishId, err)
+          failCount += 1
+        }
+      }
+
+      wx.hideLoading()
+
+      if (failCount === 0) {
+        wx.showToast({
+          title: mode === 'add'
+            ? `已更新 ${successCount} 个菜品`
+            : `已移除 ${successCount} 个菜品标签`,
+          icon: 'success'
+        })
+      } else {
+        wx.showToast({
+          title: `成功 ${successCount}，失败 ${failCount}`,
+          icon: 'none'
+        })
+      }
+
+      if (mode === 'add') {
+        this.closeAddCategoryTagModal()
+      } else {
+        this.closeRemoveTagModal()
+      }
+
+      await this.loadPageData()
+    } catch (err) {
+      wx.hideLoading()
+      console.error('批量操作失败', err)
+      wx.showToast({
+        title: '操作失败',
+        icon: 'none'
+      })
+    } finally {
+      this.setData({ applying: false })
+    }
+  },
+
   openBatchEdit(e) {
-    const name = e.currentTarget.dataset.name
-    const stat = this.data.tagStats.find(item => item.name === name)
+    const removeKey = e.currentTarget.dataset.key
+    const stat = this.data.tagStats.find(item => item.removeKey === removeKey)
     if (!stat || stat.dishes.length === 0) return
 
     const firstTag = stat.dishes[0].tag || {}
 
     this.setData({
-      selectedTagName: name,
+      selectedTagName: stat.name,
       showEditModal: true,
       affectedDishes: stat.dishes,
       batchSettings: {
         required: firstTag.required !== false,
         type: firstTag.type === 'multiple' ? 'multiple' : 'single'
-      }
+      },
+      selectedRemoveKey: removeKey
     })
   },
 
@@ -152,7 +534,7 @@ Page({
       type: settings.type
     }
 
-    if (updated.type === 'single' && Array.isArray(updated.options)) {
+    if (updated.type === 'single' && Array.isArray(updated.options) && !isCategoryRefTag(updated)) {
       let hasDefault = false
       updated.options = updated.options.map(option => {
         if (option.defaultSelected && !hasDefault) {
@@ -170,9 +552,9 @@ Page({
   },
 
   async applyBatchUpdate() {
-    const { selectedTagName, batchSettings, affectedDishes, applying } = this.data
+    const { selectedRemoveKey, batchSettings, affectedDishes, applying } = this.data
 
-    if (!selectedTagName || affectedDishes.length === 0 || applying) {
+    if (!selectedRemoveKey || affectedDishes.length === 0 || applying) {
       return
     }
 
@@ -181,7 +563,7 @@ Page({
 
     wx.showModal({
       title: '确认批量更新',
-      content: `将 ${affectedDishes.length} 个菜品中的「${selectedTagName}」标签统一设为：${requiredText}、${typeText}`,
+      content: `将 ${affectedDishes.length} 个菜品中的「${this.data.selectedTagName}」标签统一设为：${requiredText}、${typeText}`,
       success: async (res) => {
         if (!res.confirm) return
         await this.doBatchUpdate()
@@ -190,7 +572,7 @@ Page({
   },
 
   async doBatchUpdate() {
-    const { selectedTagName, batchSettings, affectedDishes } = this.data
+    const { selectedRemoveKey, batchSettings, affectedDishes } = this.data
 
     this.setData({ applying: true })
     wx.showLoading({ title: '更新中...' })
@@ -210,7 +592,7 @@ Page({
 
           let changed = false
           const tags = dish.tags.map(tag => {
-            if ((tag.name || '').trim() !== selectedTagName) {
+            if (getTagRemoveKey(tag) !== selectedRemoveKey) {
               return tag
             }
             changed = true
@@ -246,7 +628,7 @@ Page({
       }
 
       this.closeEditModal()
-      this.loadAllDishesAndTags()
+      await this.loadPageData()
     } catch (err) {
       wx.hideLoading()
       console.error('批量更新失败', err)

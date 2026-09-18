@@ -73,7 +73,7 @@ wx.cloud.init({
 | 集合 | 用途 |
 |------|------|
 | `user` | 店员 openid 记录（自动创建） |
-| `dish` | 菜品 |
+| `dish` | 菜品（建议权限：**所有用户可读，仅创建者可写**；删除走 `deleteDish` 云函数以绕过创建者限制） |
 | `dishCategory` | 菜品分类 |
 | `notice` | 公告 |
 | `order` | 点餐订单 |
@@ -92,6 +92,7 @@ wx.cloud.init({
 |--------|----------|------|
 | `login` | ✅ | 用户登录 |
 | `getCategory` | ✅ | 获取菜品分类 |
+| `deleteDish` | ✅ | 删除菜品（清理标签引用，服务端硬删/软删） |
 | `doBuy` | ✅ | 创建订单并打印 |
 | `printManage` | ✅ | 打印机 API |
 | `printBack` | 推荐 | 打印回调 |
@@ -141,7 +142,7 @@ orderFood-wxCloud/
 1. **导入项目** — 用开发者工具打开本仓库
 2. **填写 AppID** — 在 `project.config.json` 中配置你的小程序 AppID
 3. **开通云开发** — 创建云环境，将环境 ID 写入 `envList.js`
-4. **上传云函数** — 至少上传 `login`、`getCategory`、`doBuy`、`printManage`
+4. **上传云函数** — 至少上传 `login`、`getCategory`、`deleteDish`、`doBuy`、`printManage`
 5. **配置 printManage** — 填入大趋智能 AppID / AppSecret 后重新上传
 6. **创建数据库集合** — 见上文表格
 7. **添加测试菜品** — 管理后台 → 菜品管理

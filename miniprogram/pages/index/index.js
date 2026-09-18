@@ -3,6 +3,11 @@ const app = getApp()
 const db = wx.cloud.database()
 const { formatTagLabelSuffix } = require('../../utils/price.js')
 const { resolveCloudImageUrls } = require('../../utils/cloudImage.js')
+const {
+  isCategoryRefTag,
+  expandCategoryRefTag,
+  collectCategoryIdsFromDishes
+} = require('../../utils/dishTags.js')
 
 Page({
   data: {
@@ -35,6 +40,7 @@ Page({
 
   onLoad(options) {
     this.dishById = {}
+    this.categoryDishesMap = {}
     // 获取状态栏高度
     const systemInfo = wx.getSystemInfoSync()
     this.setData({
@@ -204,9 +210,12 @@ Page({
       
       // 为每个菜品添加购物车数量
       const list = goodsRes.data || []
+      const categoryDishesMap = await this.loadCategoryDishesMap(
+        collectCategoryIdsFromDishes(list)
+      )
       const mapped = list.map(goods => {
         this.dishById[goods._id] = goods
-        const normalized = this.normalizeDishTags(goods)
+        const normalized = this.normalizeDishTags(goods, categoryDishesMap)
         normalized.cartCount = this.getDishCartCount(goods._id)
         return normalized
       })
@@ -253,9 +262,52 @@ Page({
     return this.data.goodsList.find(item => item._id === dishId) || null
   },
 
+  async loadCategoryDishesMap(categoryIds = []) {
+    const uniqueIds = [...new Set((categoryIds || []).filter(Boolean))]
+    const nextMap = { ...(this.categoryDishesMap || {}) }
+    const missingIds = uniqueIds.filter(id => !nextMap[id])
+
+    await Promise.all(missingIds.map(async categoryId => {
+      const pageSize = 20
+      let page = 0
+      let dishes = []
+      let hasMore = true
+
+      while (hasMore) {
+        const res = await db.collection('dish')
+          .where({
+            categoryId,
+            status: 1
+          })
+          .orderBy('sort', 'asc')
+          .skip(page * pageSize)
+          .limit(pageSize)
+          .get()
+        const list = res.data || []
+        dishes = dishes.concat(list)
+        hasMore = list.length === pageSize
+        page += 1
+      }
+
+      nextMap[categoryId] = dishes
+      dishes.forEach(item => {
+        this.dishById[item._id] = item
+      })
+    }))
+
+    this.categoryDishesMap = nextMap
+    return nextMap
+  },
+
   async ensureDishLookup(dish) {
+    const categoryIds = collectCategoryIdsFromDishes([dish])
+    const categoryDishesMap = categoryIds.length
+      ? await this.loadCategoryDishesMap(categoryIds)
+      : (this.categoryDishesMap || {})
+
+    const expandedDish = this.normalizeDishTags(dish, categoryDishesMap)
     const missingIdSet = new Set()
-    ;(dish.tags || []).forEach(tag => {
+    ;(expandedDish.tags || []).forEach(tag => {
       ;(tag.options || []).forEach(option => {
         if (typeof option !== 'object') return
         const dishId = option.dishId || option._id || ''
@@ -293,7 +345,11 @@ Page({
       console.error('加载标签选项菜品失败', err)
     }
 
-    const goods = this.normalizeDishTags(rawGoods)
+    const categoryIds = collectCategoryIdsFromDishes([rawGoods])
+    const categoryDishesMap = categoryIds.length
+      ? await this.loadCategoryDishesMap(categoryIds)
+      : (this.categoryDishesMap || {})
+    const goods = this.normalizeDishTags(rawGoods, categoryDishesMap)
     const selectedTags = this.buildDefaultSelectedTags(goods)
     const currentDish = this.updateTagOptionSelectedState(goods, selectedTags)
     
@@ -307,13 +363,16 @@ Page({
     })
   },
 
-  normalizeDishTags(dish) {
+  normalizeDishTags(dish, categoryDishesMap = this.categoryDishesMap || {}) {
     const normalizedDish = JSON.parse(JSON.stringify(dish || {}))
-    normalizedDish.tags = (normalizedDish.tags || []).map(tag => ({
-      ...tag,
-      type: tag.type || 'single',
-      options: (tag.options || []).map(option => this.normalizeTagOption(option))
-    }))
+    normalizedDish.tags = (normalizedDish.tags || []).map(tag => {
+      const expandedTag = expandCategoryRefTag(tag, categoryDishesMap)
+      return {
+        ...expandedTag,
+        type: expandedTag.type || 'single',
+        options: (expandedTag.options || []).map(option => this.normalizeTagOption(option))
+      }
+    })
     return this.updateTagOptionSelectedState(normalizedDish, {})
   },
 

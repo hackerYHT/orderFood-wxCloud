@@ -576,6 +576,19 @@
   margin-right: 10rpx;
 }
 
+.tag-category-ref {
+  font-size: 20rpx;
+  color: #1890ff;
+  background: #e6f7ff;
+  padding: 4rpx 10rpx;
+  border-radius: 8rpx;
+  margin-left: 8rpx;
+}
+
+.category-ref-tip {
+  color: #1890ff !important;
+}
+
 .tag-required {
   font-size: 22rpx;
   color: white;

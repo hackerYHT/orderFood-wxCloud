@@ -1,33 +1,209 @@
 <!--pages/admin/tagBatch/tagBatch.wxml-->
 <view class="page">
-  <view class="tip-bar">
-    <text class="tip-icon">ℹ️</text>
-    <text class="tip-text">选择同名标签，可批量修改所有菜品中该标签的「是否必选」和「单选/多选」</text>
+  <view class="tab-bar">
+    <view
+      class="tab-item {{activeTab === 'dishes' ? 'active' : ''}}"
+      bindtap="switchTab"
+      data-tab="dishes">
+      批量添加/移除
+    </view>
+    <view
+      class="tab-item {{activeTab === 'settings' ? 'active' : ''}}"
+      bindtap="switchTab"
+      data-tab="settings">
+      标签属性设置
+    </view>
   </view>
 
   <view class="loading-tip" wx:if="{{loading}}">加载中...</view>
 
-  <view class="tag-list" wx:if="{{!loading}}">
-    <view
-      class="tag-stat-card"
-      wx:for="{{tagStats}}"
-      wx:key="name"
-      bindtap="openBatchEdit"
-      data-name="{{item.name}}">
-      <view class="tag-stat-header">
-        <text class="tag-stat-name">{{item.name}}</text>
-        <text class="tag-stat-count">{{item.dishCount}} 个菜品</text>
-      </view>
-      <view class="tag-stat-meta">
-        <text class="meta-item">必选 {{item.requiredCount}}</text>
-        <text class="meta-item">非必选 {{item.dishCount - item.requiredCount}}</text>
-        <text class="meta-item">单选 {{item.singleCount}}</text>
-        <text class="meta-item">多选 {{item.multipleCount}}</text>
-      </view>
-      <view class="tag-stat-action">点击批量编辑 →</view>
+  <!-- 批量添加/移除 -->
+  <view wx:if="{{!loading && activeTab === 'dishes'}}">
+    <view class="tip-bar">
+      <text class="tip-icon">ℹ️</text>
+      <text class="tip-text">勾选菜品后可批量添加「分类动态标签」。标签选项会随分类内菜品增删改自动更新，无需手动维护。</text>
     </view>
 
-    <van-empty wx:if="{{tagStats.length === 0}}" description="暂无标签，请先在菜品管理中添加" />
+    <view class="filter-bar">
+      <picker
+        mode="selector"
+        range="{{filterCategoryOptions}}"
+        value="{{filterCategoryIndex}}"
+        bindchange="onFilterCategoryChange">
+        <view class="filter-picker">
+          筛选分类：{{filterCategoryOptions[filterCategoryIndex] || '全部'}}
+        </view>
+      </picker>
+      <view class="select-all-btn" bindtap="toggleSelectAll">
+        {{selectAll ? '取消全选' : '全选当前'}}
+      </view>
+    </view>
+
+    <view class="dish-list">
+      <view
+        class="dish-row {{item.selected ? 'selected' : ''}}"
+        wx:for="{{displayDishes}}"
+        wx:key="_id"
+        bindtap="toggleDishSelect"
+        data-id="{{item._id}}">
+        <view class="dish-checkbox {{item.selected ? 'checked' : ''}}">
+          <text wx:if="{{item.selected}}">✓</text>
+        </view>
+        <view class="dish-main">
+          <view class="dish-name">{{item.name}}</view>
+          <view class="dish-meta">
+            <text>{{item.categoryName || '未分类'}}</text>
+            <text wx:if="{{item.tagCount > 0}}">· {{item.tagCount}} 个标签</text>
+          </view>
+        </view>
+      </view>
+      <van-empty wx:if="{{displayDishes.length === 0}}" description="暂无菜品" />
+    </view>
+
+    <view class="selection-bar" wx:if="{{selectedDishIds.length > 0}}">
+      <view class="selection-info">
+        <text>已选 {{selectedDishIds.length}} 个菜品</text>
+        <text class="clear-link" bindtap="clearSelection">清空</text>
+      </view>
+      <view class="selection-actions">
+        <view class="action-btn primary" bindtap="openAddCategoryTagModal">添加分类标签</view>
+        <view class="action-btn outline" bindtap="openRemoveTagModal">批量移除标签</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 标签属性设置 -->
+  <view wx:if="{{!loading && activeTab === 'settings'}}">
+    <view class="tip-bar">
+      <text class="tip-icon">ℹ️</text>
+      <text class="tip-text">选择同名标签，可批量修改所有菜品中该标签的「是否必选」和「单选/多选」</text>
+    </view>
+
+    <view class="tag-list">
+      <view
+        class="tag-stat-card"
+        wx:for="{{tagStats}}"
+        wx:key="removeKey"
+        bindtap="openBatchEdit"
+        data-key="{{item.removeKey}}">
+        <view class="tag-stat-header">
+          <view class="tag-stat-title-wrap">
+            <text class="tag-stat-name">{{item.name}}</text>
+            <text class="tag-badge" wx:if="{{item.isCategoryRef}}">分类动态</text>
+          </view>
+          <text class="tag-stat-count">{{item.dishCount}} 个菜品</text>
+        </view>
+        <view class="tag-stat-meta">
+          <text class="meta-item">必选 {{item.requiredCount}}</text>
+          <text class="meta-item">非必选 {{item.dishCount - item.requiredCount}}</text>
+          <text class="meta-item">单选 {{item.singleCount}}</text>
+          <text class="meta-item">多选 {{item.multipleCount}}</text>
+        </view>
+        <view class="tag-stat-action">点击批量编辑 →</view>
+      </view>
+
+      <van-empty wx:if="{{tagStats.length === 0}}" description="暂无标签，请先在菜品管理中添加" />
+    </view>
+  </view>
+
+  <!-- 添加分类标签弹窗 -->
+  <view class="modal-mask" wx:if="{{showAddCategoryTagModal}}" catchtap="closeAddCategoryTagModal">
+    <view class="modal-dialog" catchtap="stopPropagation">
+      <view class="modal-title">添加分类标签</view>
+      <scroll-view class="modal-content" scroll-y>
+        <view class="form-item">
+          <view class="form-label">引用分类</view>
+          <picker
+            mode="selector"
+            range="{{categories}}"
+            range-key="name"
+            value="{{addTagForm.categoryIndex}}"
+            bindchange="onAddTagCategoryChange">
+            <view class="form-input picker-input">
+              {{categories[addTagForm.categoryIndex].name || '请选择分类'}}
+            </view>
+          </picker>
+          <view class="form-note">点餐时自动展示该分类下所有上架菜品作为选项</view>
+        </view>
+
+        <view class="form-item">
+          <view class="form-label">标签名称</view>
+          <input
+            class="form-input"
+            placeholder="默认使用分类名称"
+            value="{{addTagForm.name}}"
+            bindinput="onAddTagNameInput"
+          />
+        </view>
+
+        <view class="form-item">
+          <view class="form-label">是否必选</view>
+          <view class="required-quick-actions">
+            <text
+              class="quick-btn {{addTagForm.required ? 'active' : ''}}"
+              bindtap="setAddTagRequired"
+              data-required="{{true}}">设为必选</text>
+            <text
+              class="quick-btn outline {{!addTagForm.required ? 'active' : ''}}"
+              bindtap="setAddTagRequired"
+              data-required="{{false}}">设为非必选</text>
+          </view>
+        </view>
+
+        <view class="form-item">
+          <view class="form-label">选择类型</view>
+          <view class="type-selector">
+            <view
+              class="type-option {{addTagForm.type === 'single' ? 'active' : ''}}"
+              bindtap="selectAddTagType"
+              data-type="single">
+              单选
+            </view>
+            <view
+              class="type-option {{addTagForm.type === 'multiple' ? 'active' : ''}}"
+              bindtap="selectAddTagType"
+              data-type="multiple">
+              多选
+            </view>
+          </view>
+        </view>
+
+        <view class="form-note">
+          将为已选 {{selectedDishIds.length}} 个菜品添加此标签。若菜品已有相同分类引用标签，将更新其设置。
+        </view>
+      </scroll-view>
+      <view class="modal-footer">
+        <view class="modal-btn cancel" bindtap="closeAddCategoryTagModal">取消</view>
+        <view class="modal-btn confirm" bindtap="confirmAddCategoryTag">确认添加</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 批量移除标签弹窗 -->
+  <view class="modal-mask" wx:if="{{showRemoveTagModal}}" catchtap="closeRemoveTagModal">
+    <view class="modal-dialog" catchtap="stopPropagation">
+      <view class="modal-title">批量移除标签</view>
+      <scroll-view class="modal-content" scroll-y>
+        <view class="form-item">
+          <view class="form-label">从 {{selectedDishIds.length}} 个菜品中移除</view>
+          <view class="remove-tag-list">
+            <view
+              class="remove-tag-item {{selectedRemoveKey === item.removeKey ? 'active' : ''}}"
+              wx:for="{{removableTags}}"
+              wx:key="removeKey"
+              bindtap="selectRemoveTag"
+              data-key="{{item.removeKey}}">
+              <text class="remove-tag-name">{{item.label}}</text>
+              <text class="remove-tag-count">{{item.count}} 个菜品</text>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="modal-footer">
+        <view class="modal-btn cancel" bindtap="closeRemoveTagModal">取消</view>
+        <view class="modal-btn confirm" bindtap="confirmRemoveTag">确认移除</view>
+      </view>
+    </view>
   </view>
 
   <!-- 批量编辑弹窗 -->
@@ -80,7 +256,7 @@
         </view>
 
         <view class="form-note">
-          注：各菜品的标签选项内容不会同步修改，仅统一「是否必选」和「单选/多选」设置。
+          注：分类动态标签的选项内容会随分类菜品自动更新；此处仅统一「是否必选」和「单选/多选」设置。
         </view>
       </scroll-view>
       <view class="modal-footer">

@@ -16,7 +16,7 @@
         <!-- 长按编辑/删除 -->
         <view class="category-actions">
           <text class="action-icon edit" catchtap="showEditCategoryModal" data-category="{{item}}">编辑</text>
-          <text class="action-icon delete" catchtap="deleteCategory" data-category="{{item}}">删除</text>
+          <text class="action-icon delete" catchtap="deleteCategory" data-id="{{item._id}}" data-name="{{item.name}}">删除</text>
         </view>
       </view>
       
@@ -68,7 +68,7 @@
             </view>
             <view class="action-btn edit" bindtap="showEditDishModal" data-dish="{{item}}">编辑</view>
             <view class="action-btn copy" bindtap="showCopyDishModal" data-dish="{{item}}">复制</view>
-            <view class="action-btn delete" bindtap="deleteDish" data-dish="{{item}}">删除</view>
+            <view class="action-btn delete" bindtap="deleteDish" data-id="{{item._id}}" data-name="{{item.name}}">删除</view>
           </view>
         </view>
 
@@ -204,6 +204,7 @@
                   <view class="tag-card-title">
                     <text class="tag-name">{{item.name}}</text>
                     <text class="tag-type">{{item.type === 'single' ? '单选' : '多选'}}</text>
+                    <text class="tag-category-ref" wx:if="{{item.source === 'categoryRef' || item.categoryId}}">分类动态</text>
                     <text class="tag-required" wx:if="{{item.required}}">必选</text>
                   </view>
                   <view class="tag-card-actions">
@@ -211,7 +212,10 @@
                     <text class="tag-action-btn delete" bindtap="deleteTag" data-index="{{index}}">删除</text>
                   </view>
                 </view>
-                <view class="tag-options">
+                <view class="tag-options" wx:if="{{item.source === 'categoryRef' || item.categoryId}}">
+                  <text class="option-item category-ref-tip">引用分类：{{item.categoryName || item.name}}（点餐时自动同步该分类下菜品）</text>
+                </view>
+                <view class="tag-options" wx:else>
                   <text class="option-item" wx:for="{{item.options}}" wx:key="index" wx:for-item="option">
                     {{option.name || option}}{{option.price > 0 ? priceHelper.formatTagLabelSuffix(option.price) : ''}}{{option.defaultSelected ? ' 默认' : ''}}
                   </text>
@@ -320,6 +324,7 @@
               wx:for="{{allDishesForOptions}}"
               wx:key="_id"
               bindtap="toggleOptionDish"
+              data-id="{{item._id}}"
               data-dish="{{item}}">
               <image class="dish-option-image" wx:if="{{item.imageUrl || item.image}}" src="{{item.imageUrl || item.image}}" mode="aspectFill"></image>
               <view class="dish-option-image placeholder" wx:else>无图</view>
