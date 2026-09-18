@@ -773,30 +773,13 @@ Page({
     })
   },
 
-  // 去结算
+  // 去确认打印
   goToSettle() {
     if (this.data.cartCount === 0) {
       wx.showToast({ title: '购物车为空', icon: 'none' })
       return
     }
 
-    // 检查是否有桌码，如果没有则提示用户扫桌码
-    if (!this.data.tableNumber) {
-      wx.showModal({
-        title: '提示',
-        content: '请先扫描桌码',
-        confirmText: '立即扫码',
-        cancelText: '取消',
-        success: (res) => {
-          if (res.confirm) {
-            this.scanTableCode()
-          }
-        }
-      })
-      return
-    }
-
-    // 有桌码，跳转到结算页面
     this.navigateToSettle()
   },
 
@@ -883,157 +866,6 @@ Page({
       }
     })
   },
-
-  // 创建订单
-  async createOrder(options = {}) {
-    const { payWithBalance = true } = options
-    wx.showLoading({ title: '下单中...' })
-    
-    try {
-      const openid = app.globalData.openid
-      
-      // 构造订单商品列表
-      const orderGoods = []
-      for (let cartKey in this.data.cart) {
-        const item = this.data.cart[cartKey]
-        // 将 tags 对象转换为字符串数组
-        let tagsArray = []
-        if (item.tagLabels && Array.isArray(item.tagLabels)) {
-          // 如果已有 tagLabels，直接使用
-          tagsArray = item.tagLabels
-        } else if (item.tags && typeof item.tags === 'object') {
-          // 将 tags 对象转换为数组
-          Object.keys(item.tags).forEach(tagId => {
-            const value = item.tags[tagId]
-            if (Array.isArray(value)) {
-              tagsArray.push(...value)
-            } else if (value) {
-              tagsArray.push(value)
-            }
-          })
-        }
-        
-        orderGoods.push({
-          dishId: item.dishId || item.info._id,
-          dishName: item.info.name,
-          dishImage: item.info.image,
-          price: Number(item.unitPrice) || Number(item.info.price) || 0,
-          basePrice: Number(item.basePrice) || Number(item.info.price) || 0,
-          extraPrice: Number(item.extraPrice) || 0,
-          count: item.count,
-          tags: tagsArray, // 改为字符串数组
-          selectedOptions: item.selectedOptions || [],
-          canUseMiandan: item.info.canUseMiandan || false // 是否可以参与免单
-        })
-      }
-      
-      // 检查是否有免单次数（仅用于前端提示，实际扣减在云函数事务中）
-      const miandanRes = await db.collection('freeBuy').where({
-        _openid: openid
-      }).get()
-      
-      let useMiandan = false
-      let finalPrice = this.data.cartTotalPrice
-      const miandanDish = orderGoods.length === 1 ? orderGoods[0] : null
-      const canUseMiandanForOrder = !!miandanDish &&
-        miandanDish.canUseMiandan === true &&
-        miandanDish.count === 1 &&
-        (Number(miandanDish.extraPrice) || 0) === 0
-      
-      if (canUseMiandanForOrder && miandanRes.data && miandanRes.data.length > 0 && miandanRes.data[0].count > 0) {
-        // 有免单次数，询问是否使用
-        const modalRes = await new Promise((resolve) => {
-          wx.showModal({
-            title: '免单机会',
-            content: `您有${miandanRes.data[0].count}次免单机会，是否使用？`,
-            success: (res) => resolve(res)
-          })
-        })
-        
-        if (modalRes.confirm) {
-          useMiandan = true
-          finalPrice = 0
-        }
-      }
-      
-      // 调用云函数，使用事务处理订单创建、余额扣除、免单次数减少
-      const doBuyRes = await wx.cloud.callFunction({
-        name: 'doBuy',
-        data: {
-          orderGoods,
-          totalPrice: this.data.cartTotalPrice,
-          finalPrice,
-          useMiandan,
-          payWithBalance,
-          tableNumber: this.data.tableNumber || '' // 传递桌码号
-        }
-      })
-
-      if (!doBuyRes.result || !doBuyRes.result.success) {
-        const errorMsg = doBuyRes.result?.error || '下单失败'
-        throw new Error(errorMsg)
-      }
-
-      const orderId = doBuyRes.result.orderId
-
-      if (payWithBalance) {
-        // 余额支付：云函数已处理完成
-        wx.hideLoading()
-        wx.showToast({ title: '下单成功', icon: 'success' })
-      } else {
-        // 微信支付：调用统一下单云函数
-        wx.hideLoading()
-        wx.showLoading({ title: '拉起支付中...' })
-
-        const nonceStr = Math.random().toString(36).substr(2, 15) + Date.now().toString(36)
-
-        const payRes = await wx.cloud.callFunction({
-          name: 'pay',
-          data: {
-            body: `点餐订单支付¥${finalPrice.toFixed(2)}`,
-            outTradeNo: orderId,
-            totalFee: finalPrice, // 元，云函数里会转为分
-            nonceStr
-          }
-        })
-
-        const payment = payRes.result && payRes.result.payment ? payRes.result.payment : payRes.result
-
-        wx.hideLoading()
-        await wx.requestPayment(payment)
-
-        wx.showToast({ title: '支付成功，已下单', icon: 'success' })
-      }
-      
-      // 清空购物车
-      this.setData({
-        cart: {},
-        cartCount: 0,
-        cartTotalPrice: 0,
-        cartTotalPriceText: '0.00',
-        showCart: false
-      })
-      
-      // 刷新用户信息
-      this.loadUserInfo()
-      
-      // 跳转到订单页面
-      setTimeout(() => {
-        wx.switchTab({
-          url: '/pages/myorder/myorder'
-        })
-      }, 1500)
-      
-    } catch (err) {
-      console.error('创建订单失败', err)
-      wx.hideLoading()
-      wx.showToast({ 
-        title: err.message || '下单失败', 
-        icon: 'none' 
-      })
-    }
-  },
-
 
   // 页面触底加载更多菜品
   onReachBottom() {

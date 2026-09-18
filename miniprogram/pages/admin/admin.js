@@ -25,24 +25,10 @@ Page({
     })
   },
 
-  // 用户管理
-  goToUser() {
-    wx.navigateTo({
-      url: '/pages/admin/user/user'
-    })
-  },
-
   // 订单管理
   goToOrder() {
     wx.navigateTo({
       url: '/pages/admin/order/order'
-    })
-  },
-
-  // 充值选项管理
-  goToRechargeOptions() {
-    wx.navigateTo({
-      url: '/pages/admin/rechargeOptions/rechargeOptions'
     })
   },
 

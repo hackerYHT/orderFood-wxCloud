@@ -13,22 +13,10 @@
         bind:click="goToDish"
       />
       <van-grid-item 
-        icon="friends-o" 
-        icon-color="#1989fa"
-        text="会员管理" 
-        bind:click="goToUser"
-      />
-      <van-grid-item 
         icon="orders-o" 
         icon-color="#07c160"
         text="订单管理" 
         bind:click="goToOrder"
-      />
-      <van-grid-item 
-        icon="credit-pay" 
-        icon-color="#ff976a"
-        text="充值选项管理" 
-        bind:click="goToRechargeOptions"
       />
       <van-grid-item 
         icon="volume-o" 

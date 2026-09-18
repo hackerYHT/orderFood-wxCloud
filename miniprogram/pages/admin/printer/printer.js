@@ -435,18 +435,7 @@ Page({
       // 实付价格，居右显示
       content += `<RIGHT><font# bolder=0 height=2 width=1>实付  ￥${finalPrice}</font#></RIGHT><BR>`
       
-      // 显示支付方式
-      let payMethodText = ''
-      if (testOrder.useMiandan) {
-        payMethodText = '免单支付'
-      } else if (testOrder.payWithBalance !== undefined) {
-        payMethodText = testOrder.payWithBalance ? '余额支付' : '微信支付'
-      } else {
-        payMethodText = '微信支付'
-      }
-      if (payMethodText) {
-        content += `<LEFT>支付方式: ${payMethodText}</LEFT><BR>`
-      }
+      content += `<LEFT>订单来源: 店员口头点餐（测试）</LEFT><BR>`
       
       content += `<C>--------------------------------</C><BR>`
       

@@ -181,11 +181,55 @@
 
 /* 功能菜单 */
 .menu-section {
-  margin: 0 30rpx;
+  margin: -60rpx 30rpx 20rpx;
   background: white;
   border-radius: 20rpx;
   overflow: hidden;
   box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 32rpx 30rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-icon {
+  font-size: 40rpx;
+  margin-right: 20rpx;
+}
+
+.menu-text {
+  flex: 1;
+  font-size: 30rpx;
+  color: #333;
+}
+
+.menu-text-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.menu-desc {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.menu-arrow {
+  font-size: 40rpx;
+  color: #ccc;
+  line-height: 1;
+}
+
+.tips-item {
+  align-items: flex-start;
 }
 
 .service-btn {

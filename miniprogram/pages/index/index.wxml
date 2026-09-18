@@ -38,7 +38,6 @@
         <view class="goods-info">
           <view class="goods-name">{{item.name}}</view>
           <view class="goods-desc" wx:if="{{item.description || item.desc}}">{{item.description || item.desc}}</view>
-          <view class="miandan-tip" wx:if="{{item.canUseMiandan}}">可参与免单活动</view>
           <view class="goods-footer">
             <view class="goods-price">
               <text class="price-symbol">¥</text>
@@ -76,13 +75,13 @@
             <text class="price-symbol">¥</text>
             <text class="price-num">{{cartTotalPriceText}}</text>
           </view>
-          <view class="cart-tip" wx:if="{{tableNumber}}">{{tableNumber}}号桌</view>
-          <view class="cart-tip" wx:else>请微信扫桌码点餐</view>
+          <view class="cart-tip" wx:if="{{tableNumber}}">桌号：{{tableNumber}}</view>
+          <view class="cart-tip" wx:else>店员口头点餐 · 选菜后确认打印</view>
         </view>
       </view>
       <view class="cart-right">
         <view class="settle-btn {{cartCount > 0 ? 'active' : ''}}" bindtap="goToSettle">
-          去结算
+          确认打印
         </view>
       </view>
     </view>
@@ -133,7 +132,7 @@
         </view>
       </view>
       <view class="cart-footer-right">
-        <view class="cart-settle-btn" bindtap="goToSettle">去结算</view>
+        <view class="cart-settle-btn" bindtap="goToSettle">确认打印</view>
       </view>
     </view>
   </view>
@@ -149,7 +148,6 @@
           <view class="dish-detail-info">
             <view class="dish-detail-name">{{currentDish.name}}</view>
             <view class="dish-detail-desc" wx:if="{{currentDish.description}}">{{currentDish.description}}</view>
-            <view class="miandan-tip" wx:if="{{currentDish.canUseMiandan}}">可参与免单活动</view>
             <view class="dish-detail-price">
               <text class="price-symbol">¥</text>
               <text class="price-num">{{currentDish.price}}</text>
@@ -219,9 +217,4 @@
     </view>
   </view>
 
-  <!-- 用户授权组件 -->
-  <avatar-nickname-modal 
-    showAvaModal="{{showAuthModal}}" 
-    bind:saved="onUserInfoSaved">
-  </avatar-nickname-modal>
 </view>

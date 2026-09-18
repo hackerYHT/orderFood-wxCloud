@@ -46,6 +46,32 @@
   background: white;
 }
 
+.table-code-input {
+  margin: 0 30rpx;
+  padding: 24rpx 28rpx;
+  font-size: 30rpx;
+  color: #333;
+  background: #f8f8f8;
+  border-radius: 12rpx;
+  border: 2rpx solid #eee;
+}
+
+.remark-wrapper {
+  padding: 0 30rpx;
+}
+
+.remark-input {
+  width: 100%;
+  min-height: 120rpx;
+  padding: 24rpx 28rpx;
+  font-size: 28rpx;
+  color: #333;
+  background: #f8f8f8;
+  border-radius: 12rpx;
+  border: 2rpx solid #eee;
+  box-sizing: border-box;
+}
+
 /* 订单类型选择 */
 .order-type-list {
   display: flex;

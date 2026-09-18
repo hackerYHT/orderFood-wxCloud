@@ -10,9 +10,9 @@ cloud.init({
 
 const db = cloud.database()
 const baseUrl = 'https://iot-device.trenditiot.com'
-//访问https://open.trenditiot.com 注册登录，得到appid和appsecret
-const appid = '填写你的appid' // 填写你的appid
-const appsecret = '填写你的appsecret' // 填写你的appsecret
+// 访问 https://open.trenditiot.com 注册登录获取 appid 和 appsecret，开发文档见 https://trendit.cn/dev
+const appid = '1550546555733012480'
+const appsecret = 'NL4I280R0S9tZTu9orUZc2D6OF8Fxazj'
 
 // 生成随机字符串
 function getNonceStr() {
@@ -27,6 +27,13 @@ function getSign(uid, stime, appid, body) {
   md5sum.update(strToSign)
   const signature = md5sum.digest('hex')
   return signature
+}
+
+// 判断大趋 API 业务是否成功（HTTP 200 时 body 内 code 仍可能非 0）
+function isApiSuccess(apiResult) {
+  if (!apiResult) return false
+  const code = apiResult.code
+  return code === 0 || code === '0'
 }
 
 // HTTP请求封装
@@ -100,7 +107,16 @@ exports.main = async (event, context) => {
           'sign': getSign(uid, time, appid, body)
         }
       })
-      ctx.body = { success: true, data: result }
+      if (isApiSuccess(result)) {
+        ctx.body = { success: true, data: result }
+      } else {
+        ctx.body = {
+          success: false,
+          error: result.message || result.msg || '绑定失败',
+          code: result.code,
+          data: result
+        }
+      }
     } catch (error) {
       console.error('绑定打印机失败', error)
       ctx.body = {
@@ -291,7 +307,16 @@ exports.main = async (event, context) => {
           'sign': getSign(uid, time, appid, printData)
         }
       })
-      ctx.body = { success: true, data: result }
+      if (isApiSuccess(result)) {
+        ctx.body = { success: true, data: result }
+      } else {
+        ctx.body = {
+          success: false,
+          error: result.message || result.msg || '打印失败',
+          code: result.code,
+          data: result
+        }
+      }
     } catch (error) {
       console.error('打印小票失败', error)
       ctx.body = {
