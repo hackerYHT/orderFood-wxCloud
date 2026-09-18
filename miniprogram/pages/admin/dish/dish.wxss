@@ -279,6 +279,12 @@
   border: 2rpx solid #fa8c16;
 }
 
+.action-btn.copy {
+  background: #f6ffed;
+  color: #52c41a;
+  border: 2rpx solid #52c41a;
+}
+
 .action-btn.delete {
   background: #fff1f0;
   color: #f5222d;
@@ -388,6 +394,20 @@
   padding: 0 20rpx;
   font-size: 28rpx;
   box-sizing: border-box;
+}
+
+.picker-input {
+  display: flex;
+  align-items: center;
+  color: #333;
+}
+
+.copy-source-name {
+  font-size: 28rpx;
+  color: #333;
+  padding: 20rpx;
+  background: #f9f9f9;
+  border-radius: 10rpx;
 }
 
 .form-textarea {

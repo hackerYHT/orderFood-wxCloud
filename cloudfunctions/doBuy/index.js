@@ -5,11 +5,30 @@ cloud.init({
 })
 
 const db = cloud.database()
+const PACKAGING_FEE = 1
 
-// 生成打印内容
-function generatePrintContent(order, shopInfo) {
-  const orderTypeText = order.orderType === 'dineIn' ? '堂食' : '打包'
+const getStringWidth = (str) => {
+  if (!str) return 0
+  let width = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charAt(i)
+    if (/[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]/.test(char)) {
+      width += 2
+    } else {
+      width += 1
+    }
+  }
+  return width
+}
 
+const generateSpaces = (count) => ' '.repeat(count)
+
+const escapeHtml = (str) => {
+  if (!str) return ''
+  return String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+const getOrderDate = (order) => {
   let date = new Date()
   if (order.createTime) {
     if (order.createTime instanceof Date) {
@@ -20,56 +39,30 @@ function generatePrintContent(order, shopInfo) {
       date = new Date(order.createTime)
     }
   }
+  return date
+}
 
-  const formatDate = (d) => {
-    const beijingTime = new Date(d.getTime() + 8 * 60 * 60 * 1000)
-    const pad = (n) => (n < 10 ? '0' + n : n)
-    return `${beijingTime.getUTCFullYear()}-${pad(beijingTime.getUTCMonth() + 1)}-${pad(beijingTime.getUTCDate())} ${pad(beijingTime.getUTCHours())}:${pad(beijingTime.getUTCMinutes())}`
+const formatDate = (d) => {
+  const beijingTime = new Date(d.getTime() + 8 * 60 * 60 * 1000)
+  const pad = (n) => (n < 10 ? '0' + n : n)
+  return `${beijingTime.getUTCFullYear()}-${pad(beijingTime.getUTCMonth() + 1)}-${pad(beijingTime.getUTCDate())} ${pad(beijingTime.getUTCHours())}:${pad(beijingTime.getUTCMinutes())}`
+}
+
+// ticketType: 'front' 前台（含价格） | 'kitchen' 后厨（无价格）
+function generatePrintContent(order, shopInfo, ticketType = 'front') {
+  const isKitchen = ticketType === 'kitchen'
+  const orderTypeText = order.orderType === 'dineIn' ? '堂食' : '打包'
+  const date = getOrderDate(order)
+
+  let content = ''
+  if (isKitchen) {
+    content += `<C><font# bolder=1 height=2 width=2>后厨</font#></C><BR>`
+    content += `<C><font# bolder=1 height=2 width=2>${orderTypeText}</font#></C><BR>`
+  } else {
+    content += `<C><font# bolder=1 height=2 width=2>前台·${orderTypeText}订单</font#></C><BR>`
   }
-
-  const getStringWidth = (str) => {
-    if (!str) return 0
-    let width = 0
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charAt(i)
-      if (/[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]/.test(char)) {
-        width += 2
-      } else {
-        width += 1
-      }
-    }
-    return width
-  }
-
-  const generateSpaces = (count) => ' '.repeat(count)
-
-  const escapeHtml = (str) => {
-    if (!str) return ''
-    return String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  }
-
-  let content = `<C>*</C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C><font# bolder=1 height=2 width=2>${orderTypeText}订单</font#></C><BR>`
   content += `<C><font# bolder=1 height=2 width=2>${escapeHtml(shopInfo?.name || '老叶原汤手工拉面')}</font#></C><BR>`
-  content += `<BR>`
-
-  content += `<C>********************************</C><BR>`
+  content += `<C>--------------------------------</C><BR>`
   content += `<LEFT>订单编号: ${escapeHtml(order._id)}</LEFT><BR>`
   content += `<LEFT>下单时间: ${formatDate(date)}</LEFT><BR>`
 
@@ -78,7 +71,11 @@ function generatePrintContent(order, shopInfo) {
   }
 
   if (order.remark) {
-    content += `<LEFT>备注: ${escapeHtml(order.remark)}</LEFT><BR>`
+    if (isKitchen) {
+      content += `<C><font# bolder=1 height=2 width=2>备注: ${escapeHtml(order.remark)}</font#></C><BR>`
+    } else {
+      content += `<LEFT>备注: ${escapeHtml(order.remark)}</LEFT><BR>`
+    }
   }
 
   content += `<C>--------------商品--------------</C><BR>`
@@ -87,45 +84,60 @@ function generatePrintContent(order, shopInfo) {
     order.goods.forEach(item => {
       const dishName = escapeHtml(item.dishName || item.goodsName || '未知菜品')
       const count = item.count || 1
-      const price = parseFloat(item.price || 0).toFixed(2)
-      const rightPart = `×${count}  ￥${price}`
+      const rightPart = isKitchen
+        ? `×${count}`
+        : `×${count}  ￥${parseFloat(item.price || 0).toFixed(2)}`
       const dishNameWidth = getStringWidth(dishName)
       const rightPartWidth = getStringWidth(rightPart)
       const totalWidth = 31
       const spacesNeeded = totalWidth - dishNameWidth - rightPartWidth
       const spaces = spacesNeeded > 0 ? generateSpaces(spacesNeeded) : ' '
-      content += `<LEFT><font# bolder=0 height=2 width=1>${dishName}${spaces}${rightPart}</font#></LEFT><BR>`
+      const fontHeight = isKitchen ? 2 : 1
+      content += `<LEFT><font# bolder=0 height=${fontHeight} width=1>${dishName}${spaces}${rightPart}</font#></LEFT><BR>`
 
       if (item.tags && Array.isArray(item.tags) && item.tags.length > 0) {
-        const tagsText = item.tags.map(tag => escapeHtml(tag)).join(' ')
-        content += `<LEFT><font# bolder=0 height=2 width=1>  ${tagsText}</font#></LEFT><BR>`
+        const tagsText = item.tags.map(tag => escapeHtml(tag)).join('<BR>')
+        content += `<LEFT><font# bolder=0 height=1 width=1>  ${tagsText}</font#></LEFT><BR>`
       }
     })
   }
 
-  const finalPrice = (order.finalPrice || 0).toFixed(2)
-
   content += `<C>--------------------------------</C><BR>`
-  content += `<RIGHT><font# bolder=0 height=2 width=1>合计  ￥${finalPrice}</font#></RIGHT><BR>`
-  content += `<LEFT>订单来源: 店员口头点餐</LEFT><BR>`
-  content += `<C>--------------------------------</C><BR>`
+  const packagingFee = Number(order.packagingFee) || 0
+  if (packagingFee > 0) {
+    if (isKitchen) {
+      content += `<LEFT><font# bolder=0 height=2 width=1>打包费</font#></LEFT><BR>`
+    } else {
+      content += `<RIGHT><font# bolder=0 height=1 width=1>打包费  ￥${packagingFee.toFixed(2)}</font#></RIGHT><BR>`
+    }
+  }
+  if (!isKitchen) {
+    const finalPrice = (order.finalPrice || 0).toFixed(2)
+    content += `<RIGHT><font# bolder=0 height=1 width=1>合计  ￥${finalPrice}</font#></RIGHT><BR>`
+    content += `<LEFT>订单来源: 店员口头点餐</LEFT><BR>`
+  }
   content += `<C>**************<font# bolder=1 height=2 width=1>完</font#><font# bolder=0 height=1 width=1>**************</font#></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
-  content += `<C></C><BR>`
   return content
+}
+
+async function callPrintNote(printer, { content, outTradeNo, voice }) {
+  const data = {
+    $url: 'printNote',
+    sn: printer.sn,
+    content,
+    copies: 1,
+    expiresInSeconds: 7200,
+    outTradeNo
+  }
+  if (voice) {
+    data.voice = voice
+    data.voicePlayTimes = 1
+    data.voicePlayInterval = 3
+  }
+  return cloud.callFunction({
+    name: 'printManage',
+    data
+  })
 }
 
 async function printOrder(orderId, orderData) {
@@ -139,32 +151,38 @@ async function printOrder(orderId, orderData) {
     const printer = printerRes.data[0]
     const shopRes = await db.collection('shopInfo').limit(1).get()
     const shopInfo = shopRes.data && shopRes.data.length > 0 ? shopRes.data[0] : null
-    const printContent = generatePrintContent(orderData, shopInfo)
     const voice = orderData.orderType === 'dineIn' ? '16' : '19'
 
-    const printRes = await cloud.callFunction({
-      name: 'printManage',
-      data: {
-        $url: 'printNote',
-        sn: printer.sn,
-        voice: voice,
-        voicePlayTimes: 1,
-        voicePlayInterval: 3,
-        content: printContent,
-        copies: 1,
-        expiresInSeconds: 7200,
-        outTradeNo: orderId
-      }
+    const kitchenContent = generatePrintContent(orderData, shopInfo, 'kitchen')
+    const frontContent = generatePrintContent(orderData, shopInfo, 'front')
+
+    const kitchenRes = await callPrintNote(printer, {
+      content: kitchenContent,
+      outTradeNo: `${orderId}_kitchen`,
+      voice
+    })
+    const frontRes = await callPrintNote(printer, {
+      content: frontContent,
+      outTradeNo: `${orderId}_front`
     })
 
-    if (printRes.result && printRes.result.success) {
-      console.log('打印订单成功', printRes.result)
+    const kitchenOk = kitchenRes.result && kitchenRes.result.success
+    const frontOk = frontRes.result && frontRes.result.success
+
+    if (kitchenOk && frontOk) {
+      console.log('打印订单成功（前台+后厨）', { kitchen: kitchenRes.result, front: frontRes.result })
       return { printed: true }
     }
 
-    const printError = printRes.result?.error || printRes.result?.data?.message || '未知错误'
-    console.error('打印订单失败', printRes.result, 'printerSn:', printer.sn)
-    return { printed: false, reason: 'print_failed', printError }
+    const failedRes = !kitchenOk ? kitchenRes : frontRes
+    const printError = failedRes.result?.error || failedRes.result?.data?.message || '未知错误'
+    const reason = !kitchenOk && !frontOk
+      ? 'print_failed'
+      : !kitchenOk
+        ? 'kitchen_print_failed'
+        : 'front_print_failed'
+    console.error('打印订单失败', { kitchenOk, frontOk, kitchen: kitchenRes.result, front: frontRes.result, printerSn: printer.sn })
+    return { printed: false, reason, printError }
   } catch (err) {
     console.error('打印订单异常', err)
     return { printed: false, reason: err.message || 'print_error' }
@@ -178,7 +196,6 @@ exports.main = async (event, context) => {
   const {
     orderGoods,
     totalPrice,
-    finalPrice,
     tableNumber,
     orderType,
     remark
@@ -188,12 +205,14 @@ exports.main = async (event, context) => {
     const finalOrderType = orderType || (tableNumber ? 'dineIn' : 'takeOut')
     const date = new Date()
     const orderTotal = Number(totalPrice) || 0
-    const orderFinal = Number(finalPrice) || orderTotal
+    const packagingFee = finalOrderType === 'takeOut' ? PACKAGING_FEE : 0
+    const orderFinal = orderTotal + packagingFee
 
     const orderData = {
       type: 'order',
       goods: orderGoods,
       totalPrice: orderTotal,
+      packagingFee,
       finalPrice: orderFinal,
       orderType: finalOrderType,
       pay_status: true,

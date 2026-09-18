@@ -76,6 +76,17 @@
 
       <van-empty wx:if="{{orderGoods.length === 0}}" description="购物车为空" />
     </view>
+
+    <view class="price-info" wx:if="{{orderGoods.length > 0}}">
+      <view class="price-item">
+        <text class="price-label">商品小计</text>
+        <text class="price-value">¥{{priceHelper.formatPrice(totalPrice)}}</text>
+      </view>
+      <view class="price-item" wx:if="{{packagingFee > 0}}">
+        <text class="price-label">打包费</text>
+        <text class="price-value">¥{{priceHelper.formatPrice(packagingFee)}}</text>
+      </view>
+    </view>
   </view>
 
   <view class="footer">

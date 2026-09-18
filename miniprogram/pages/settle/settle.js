@@ -1,9 +1,13 @@
 // pages/settle/settle.js
+const { formatTagLabelSuffix } = require('../../utils/price.js')
+const PACKAGING_FEE = 1
+
 Page({
   data: {
     orderGoods: [],
     totalPrice: 0,
     finalPrice: 0,
+    packagingFee: 0,
     orderType: 'dineIn',
     tableNumber: '',
     remark: '',
@@ -28,7 +32,32 @@ Page({
       for (let cartKey in cartData.cart) {
         const item = cartData.cart[cartKey]
         let tagsArray = []
-        if (item.tagLabels && Array.isArray(item.tagLabels)) {
+        const dishTags = item.info && item.info.tags
+        const selectedTags = item.tags
+        if (dishTags && selectedTags && typeof selectedTags === 'object' && !Array.isArray(selectedTags)) {
+          dishTags.forEach(tag => {
+            const selectedValue = selectedTags[tag.id]
+            if (!selectedValue) return
+            const selectedIds = Array.isArray(selectedValue) ? selectedValue : [selectedValue]
+            const countMap = {}
+            selectedIds.forEach(optionId => {
+              countMap[optionId] = (countMap[optionId] || 0) + 1
+            })
+            Object.keys(countMap).forEach(optionId => {
+              const count = countMap[optionId]
+              const option = (tag.options || []).find(opt => {
+                const id = opt.id || opt.name
+                return id === optionId
+              })
+              if (option) {
+                const name = option.name || option
+                const countText = count > 1 ? ` x${count}` : ''
+                const totalExtra = (Number(option.price) || 0) * count
+                tagsArray.push(`${tag.name}: ${name}${countText}${formatTagLabelSuffix(totalExtra)}`)
+              }
+            })
+          })
+        } else if (item.tagLabels && Array.isArray(item.tagLabels)) {
           tagsArray = item.tagLabels
         } else if (item.tags && typeof item.tags === 'object') {
           Object.keys(item.tags).forEach(tagId => {
@@ -57,12 +86,15 @@ Page({
       }
 
       const totalPrice = Number(cartData.totalPrice) || 0
+      const orderType = cartData.orderType || 'dineIn'
+      const packagingFee = orderType === 'takeOut' ? PACKAGING_FEE : 0
       this.setData({
         orderGoods: goodsList,
         totalPrice,
-        finalPrice: totalPrice,
+        packagingFee,
+        finalPrice: totalPrice + packagingFee,
         tableNumber: cartData.tableNumber || '',
-        orderType: cartData.orderType || 'dineIn',
+        orderType,
         remark: cartData.remark || ''
       })
 
@@ -76,7 +108,13 @@ Page({
   },
 
   selectOrderType(e) {
-    this.setData({ orderType: e.currentTarget.dataset.value })
+    const orderType = e.currentTarget.dataset.value
+    const packagingFee = orderType === 'takeOut' ? PACKAGING_FEE : 0
+    this.setData({
+      orderType,
+      packagingFee,
+      finalPrice: this.data.totalPrice + packagingFee
+    })
   },
 
   onTableNumberInput(e) {
@@ -113,6 +151,7 @@ Page({
           orderGoods: this.data.orderGoods,
           totalPrice: this.data.totalPrice,
           finalPrice: this.data.finalPrice,
+          packagingFee: this.data.packagingFee,
           tableNumber: this.data.tableNumber,
           orderType: this.data.orderType,
           remark: this.data.remark

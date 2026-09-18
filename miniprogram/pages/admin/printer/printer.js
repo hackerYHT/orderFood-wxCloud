@@ -385,94 +385,106 @@ Page({
         userPhone: '13800000000'
       }
       
-      // 生成打印内容
       const orderTypeText = testOrder.orderType === 'dineIn' ? '堂食' : '打包'
-      
-      let content = `<C><font# bolder=1 height=2 width=2>${orderTypeText}订单</font#></C><BR>`
-      content += `<C><font# bolder=1 height=2 width=2>${escapeHtml(shopInfo?.name || '老叶原汤手工拉面')}</font#></C><BR>`
-      content += `<BR>`
-      
-      // 订单编号和时间
-      content += `<C>********************************</C><BR>`
-      content += `<LEFT>订单编号: ${escapeHtml(testOrder._id)}</LEFT><BR>`
-      content += `<LEFT>下单时间: ${formatDate(date)}</LEFT><BR>`
-      
-      // 桌码号（加粗显示）
+      const shopName = escapeHtml(shopInfo?.name || '老叶原汤手工拉面')
+      const buildGoodsLines = (withPrice) => {
+        let lines = ''
+        if (testOrder.goods && testOrder.goods.length > 0) {
+          testOrder.goods.forEach(item => {
+            const dishName = escapeHtml(item.dishName || '未知菜品')
+            const count = item.count || 1
+            const rightPart = withPrice
+              ? `×${count}  ￥${parseFloat(item.price || 0).toFixed(2)}`
+              : `×${count}`
+            const dishNameWidth = getStringWidth(dishName)
+            const rightPartWidth = getStringWidth(rightPart)
+            const totalWidth = 31
+            const spacesNeeded = totalWidth - dishNameWidth - rightPartWidth
+            const spaces = spacesNeeded > 0 ? generateSpaces(spacesNeeded) : ' '
+            const fontHeight = withPrice ? 2 : 2
+            lines += `<LEFT><font# bolder=0 height=${fontHeight} width=1>${dishName}${spaces}${rightPart}</font#></LEFT><BR>`
+            if (item.tags && Array.isArray(item.tags) && item.tags.length > 0) {
+              const tagsText = item.tags.map(tag => escapeHtml(tag)).join(' ')
+              lines += `<LEFT><font# bolder=0 height=1 width=1>  ${tagsText}</font#></LEFT><BR>`
+            }
+          })
+        }
+        return lines
+      }
+
+      let kitchenContent = `<C><font# bolder=1 height=2 width=2>后厨</font#></C><BR>`
+      kitchenContent += `<C><font# bolder=1 height=2 width=2>${orderTypeText}</font#></C><BR>`
+      kitchenContent += `<C><font# bolder=1 height=2 width=2>${shopName}</font#></C><BR>`
+      kitchenContent += `<C>--------------------------------</C><BR>`
+      kitchenContent += `<LEFT>订单编号: ${escapeHtml(testOrder._id)}</LEFT><BR>`
+      kitchenContent += `<LEFT>下单时间: ${formatDate(date)}</LEFT><BR>`
       if (testOrder.tableNumber) {
-        content += `<C><font# bolder=1 height=2 width=2>桌码: ${escapeHtml(testOrder.tableNumber)}</font#></C><BR>`
+        kitchenContent += `<C><font# bolder=1 height=2 width=2>桌码: ${escapeHtml(testOrder.tableNumber)}</font#></C><BR>`
       }
-      
-      content += `<C>--------------商品--------------</C><BR>`
-      
-      // 商品列表（使用自动计算空格对齐）
-      if (testOrder.goods && testOrder.goods.length > 0) {
-        testOrder.goods.forEach(item => {
-          const dishName = escapeHtml(item.dishName || '未知菜品')
-          const count = item.count || 1
-          const price = parseFloat(item.price || 0).toFixed(2)
-          const rightPart = `×${count}  ￥${price}`
-          const dishNameWidth = getStringWidth(dishName)
-          const rightPartWidth = getStringWidth(rightPart)
-          const totalWidth = 31 // 总宽度31个字符（减少1个避免换行）
-          const spacesNeeded = totalWidth - dishNameWidth - rightPartWidth
-          const spaces = spacesNeeded > 0 ? generateSpaces(spacesNeeded) : ' '
-          content += `<LEFT><font# bolder=0 height=2 width=1>${dishName}${spaces}${rightPart}</font#></LEFT><BR>`
-          
-          // 打印标签（如果有）
-          if (item.tags && Array.isArray(item.tags) && item.tags.length > 0) {
-            const tagsText = item.tags.map(tag => escapeHtml(tag)).join(' ')
-            content += `<LEFT><font# bolder=0 height=1 width=1>  ${tagsText}</font#></LEFT><BR>`
-          }
-        })
-      }
-      
-      // 价格信息
+      kitchenContent += `<C>--------------商品--------------</C><BR>`
+      kitchenContent += buildGoodsLines(false)
+      kitchenContent += `<C>--------------------------------</C><BR>`
+      kitchenContent += `<C>**************<font# bolder=1 height=2 width=1>完</font#><font# bolder=0 height=1 width=1>**************</font#></C><BR>`
+
       const finalPrice = (testOrder.finalPrice || 0).toFixed(2)
-      
-      // 添加分隔线隔开菜品
-      content += `<C>--------------------------------</C><BR>`
-      
-      // 实付价格，居右显示
-      content += `<RIGHT><font# bolder=0 height=2 width=1>实付  ￥${finalPrice}</font#></RIGHT><BR>`
-      
-      content += `<LEFT>订单来源: 店员口头点餐（测试）</LEFT><BR>`
-      
-      content += `<C>--------------------------------</C><BR>`
-      
-      // 用户信息
+      let frontContent = `<C><font# bolder=1 height=2 width=2>前台·${orderTypeText}订单</font#></C><BR>`
+      frontContent += `<C><font# bolder=1 height=2 width=2>${shopName}</font#></C><BR>`
+      frontContent += `<C>--------------------------------</C><BR>`
+      frontContent += `<LEFT>订单编号: ${escapeHtml(testOrder._id)}</LEFT><BR>`
+      frontContent += `<LEFT>下单时间: ${formatDate(date)}</LEFT><BR>`
+      if (testOrder.tableNumber) {
+        frontContent += `<C><font# bolder=1 height=2 width=2>桌码: ${escapeHtml(testOrder.tableNumber)}</font#></C><BR>`
+      }
+      frontContent += `<C>--------------商品--------------</C><BR>`
+      frontContent += buildGoodsLines(true)
+      frontContent += `<C>--------------------------------</C><BR>`
+      frontContent += `<RIGHT><font# bolder=0 height=2 width=1>实付  ￥${finalPrice}</font#></RIGHT><BR>`
+      frontContent += `<LEFT>订单来源: 店员口头点餐（测试）</LEFT><BR>`
+      frontContent += `<C>--------------------------------</C><BR>`
       if (testOrder.userPhone) {
         const hiddenPhone = hidePhoneNumber(testOrder.userPhone)
-        content += `<LEFT><font# bolder=1 height=1 width=1>客户电话: ${escapeHtml(hiddenPhone)}</font#></LEFT><BR>`
+        frontContent += `<LEFT><font# bolder=1 height=1 width=1>客户电话: ${escapeHtml(hiddenPhone)}</font#></LEFT><BR>`
       }
-      
-      content += `<C>**************<font# bolder=1 height=2 width=1>完</font#><font# bolder=0 height=1 width=1>**************</font#></C><BR>`
+      frontContent += `<C>**************<font# bolder=1 height=2 width=1>完</font#><font# bolder=0 height=1 width=1>**************</font#></C><BR>`
 
-      // 调用打印接口
-      const printRes = await wx.cloud.callFunction({
+      const kitchenRes = await wx.cloud.callFunction({
         name: 'printManage',
         data: {
           $url: 'printNote',
           sn: printerInfo.sn,
-          voice: '16', 
+          voice: '16',
           voicePlayTimes: 1,
           voicePlayInterval: 3,
-          content: content,
+          content: kitchenContent,
           copies: 1,
           expiresInSeconds: 7200,
-          outTradeNo: 'TEST_' + Date.now() // 测试订单号
+          outTradeNo: `${testOrderId}_kitchen`
+        }
+      })
+      const frontRes = await wx.cloud.callFunction({
+        name: 'printManage',
+        data: {
+          $url: 'printNote',
+          sn: printerInfo.sn,
+          content: frontContent,
+          copies: 1,
+          expiresInSeconds: 7200,
+          outTradeNo: `${testOrderId}_front`
         }
       })
 
       wx.hideLoading()
 
-      if (printRes.result && printRes.result.success) {
+      const kitchenOk = kitchenRes.result && kitchenRes.result.success
+      const frontOk = frontRes.result && frontRes.result.success
+      if (kitchenOk && frontOk) {
         wx.showToast({
-          title: '测试打印成功',
+          title: '测试打印成功（2张）',
           icon: 'success'
         })
       } else {
         wx.showToast({
-          title: printRes.result?.error || '测试打印失败',
+          title: kitchenRes.result?.error || frontRes.result?.error || '测试打印失败',
           icon: 'none'
         })
       }

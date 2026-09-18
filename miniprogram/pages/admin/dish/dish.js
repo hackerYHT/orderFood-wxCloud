@@ -47,7 +47,13 @@ Page({
     dishPage: 0,
     dishPageSize: 20,
     dishHasMore: true,
-    loadingDishes: false
+    loadingDishes: false,
+
+    // 复制菜品
+    showCopyDishModal: false,
+    copySourceDish: null,
+    copyTargetCategoryId: '',
+    copyCategoryIndex: 0
   },
 
   onLoad() {
@@ -756,6 +762,113 @@ Page({
       console.error('保存失败', err)
       wx.showToast({
         title: '保存失败',
+        icon: 'none'
+      })
+    }
+  },
+
+  // 显示复制菜品弹窗
+  showCopyDishModal(e) {
+    const dish = e.currentTarget.dataset.dish
+    const categoryIndex = this.data.categories.findIndex(c => c._id === this.data.currentCategoryId)
+    this.setData({
+      showCopyDishModal: true,
+      copySourceDish: dish,
+      copyTargetCategoryId: this.data.currentCategoryId,
+      copyCategoryIndex: categoryIndex >= 0 ? categoryIndex : 0
+    })
+  },
+
+  closeCopyDishModal() {
+    this.setData({
+      showCopyDishModal: false
+    })
+  },
+
+  onCopyCategoryChange(e) {
+    const index = parseInt(e.detail.value, 10)
+    const category = this.data.categories[index]
+    this.setData({
+      copyCategoryIndex: index,
+      copyTargetCategoryId: category ? category._id : ''
+    })
+  },
+
+  buildCopyDishName(sourceName) {
+    const suffix = '副本'
+    const baseName = sourceName || ''
+    if (baseName.length + suffix.length <= 10) {
+      return baseName + suffix
+    }
+    return baseName.substring(0, 10 - suffix.length) + suffix
+  },
+
+  async confirmCopyDish() {
+    const { copySourceDish, copyTargetCategoryId, categories } = this.data
+
+    if (!copySourceDish) return
+
+    if (!copyTargetCategoryId) {
+      wx.showToast({
+        title: '请选择目标分类',
+        icon: 'none'
+      })
+      return
+    }
+
+    const targetCategory = categories.find(c => c._id === copyTargetCategoryId)
+    const { _id, _openid, ...sourceData } = copySourceDish
+
+    const newDishData = {
+      ...sourceData,
+      name: this.buildCopyDishName(sourceData.name),
+      categoryId: copyTargetCategoryId,
+      categoryName: targetCategory ? targetCategory.name : '',
+      tags: JSON.parse(JSON.stringify(sourceData.tags || [])),
+      createTime: new Date()
+    }
+
+    try {
+      wx.showLoading({ title: '复制中...' })
+
+      const addRes = await db.collection('dish').add({
+        data: newDishData
+      })
+
+      wx.hideLoading()
+      this.closeCopyDishModal()
+
+      const newDish = {
+        ...newDishData,
+        _id: addRes._id
+      }
+
+      if (copyTargetCategoryId !== this.data.currentCategoryId) {
+        this.setData({
+          currentCategoryId: copyTargetCategoryId
+        }, () => {
+          this.loadDishes()
+        })
+      } else {
+        this.loadDishes()
+      }
+      this.loadAllDishesForOptions()
+
+      this.setData({
+        showDishModal: true,
+        editDishMode: true,
+        currentDish: newDish
+      })
+
+      wx.showToast({
+        title: '复制成功，请修改名称',
+        icon: 'success'
+      })
+    } catch (err) {
+      wx.hideLoading()
+      console.error('复制失败', err)
+      wx.showToast({
+        title: '复制失败',
         icon: 'none'
       })
     }

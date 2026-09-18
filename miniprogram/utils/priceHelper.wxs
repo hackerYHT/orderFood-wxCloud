@@ -1,6 +1,14 @@
 /**
  * 价格格式化工具
  */
+function normalizePrice(price) {
+  var num = parseFloat(price)
+  if (isNaN(num) || num <= 0) {
+    return 0
+  }
+  return num
+}
+
 function formatPrice(price) {
   if (price === null || price === undefined || price === '') {
     return '0.00'
@@ -12,7 +20,26 @@ function formatPrice(price) {
   return num.toFixed(2)
 }
 
+function formatTagOptionPrice(price) {
+  var num = normalizePrice(price)
+  if (!num) {
+    return ''
+  }
+  return '+' + num.toFixed(2) + '元'
+}
+
+function formatTagLabelSuffix(price) {
+  var num = normalizePrice(price)
+  if (!num) {
+    return ''
+  }
+  return ' +' + num.toFixed(2) + '元'
+}
+
 module.exports = {
-  formatPrice: formatPrice
+  normalizePrice: normalizePrice,
+  formatPrice: formatPrice,
+  formatTagOptionPrice: formatTagOptionPrice,
+  formatTagLabelSuffix: formatTagLabelSuffix
 }
 

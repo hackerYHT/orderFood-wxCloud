@@ -1,6 +1,7 @@
 // pages/index/index.js
 const app = getApp()
 const db = wx.cloud.database()
+const { formatTagLabelSuffix } = require('../../utils/price.js')
 
 Page({
   data: {
@@ -202,8 +203,9 @@ Page({
       // 为每个菜品添加购物车数量
       const list = goodsRes.data || []
       const mapped = list.map(goods => {
-        goods.cartCount = this.getDishCartCount(goods._id)
-        return goods
+        const normalized = this.normalizeDishTags(goods)
+        normalized.cartCount = this.getDishCartCount(goods._id)
+        return normalized
       })
       
       this.setData({
@@ -236,9 +238,20 @@ Page({
     this.loadGoods(menuId)
   },
 
+  getGoodsById(dishId) {
+    if (!dishId) return null
+    return this.data.goodsList.find(item => item._id === dishId) || null
+  },
+
+  getGoodsFromEvent(e) {
+    const dishId = e.currentTarget.dataset.id
+    return this.getGoodsById(dishId) || e.currentTarget.dataset.goods || null
+  },
+
   // 添加到购物车 - 显示标签选择弹窗
   addToCart(e) {
-    const goods = this.normalizeDishTags(e.currentTarget.dataset.goods)
+    const goods = this.normalizeDishTags(this.getGoodsFromEvent(e))
+    if (!goods || !goods._id) return
     const selectedTags = this.buildDefaultSelectedTags(goods)
     const currentDish = this.updateTagOptionSelectedState(goods, selectedTags)
     
@@ -256,6 +269,7 @@ Page({
     const normalizedDish = JSON.parse(JSON.stringify(dish || {}))
     normalizedDish.tags = (normalizedDish.tags || []).map(tag => ({
       ...tag,
+      type: tag.type || 'single',
       options: (tag.options || []).map(option => this.normalizeTagOption(option))
     }))
     return this.updateTagOptionSelectedState(normalizedDish, {})
@@ -303,6 +317,14 @@ Page({
     return selectedTags
   },
 
+  getTagOptionCount(selectedValue, optionId) {
+    if (!selectedValue || !optionId) return 0
+    if (Array.isArray(selectedValue)) {
+      return selectedValue.filter(id => id === optionId).length
+    }
+    return selectedValue === optionId ? 1 : 0
+  },
+
   updateTagOptionSelectedState(dish, selectedTags) {
     const nextDish = JSON.parse(JSON.stringify(dish || {}))
     nextDish.tags = (nextDish.tags || []).map(tag => ({
@@ -310,12 +332,11 @@ Page({
       options: (tag.options || []).map(option => {
         const normalizedOption = this.normalizeTagOption(option)
         const selectedValue = selectedTags[tag.id]
-        const selected = Array.isArray(selectedValue)
-          ? selectedValue.includes(normalizedOption.id)
-          : selectedValue === normalizedOption.id
+        const selectedCount = this.getTagOptionCount(selectedValue, normalizedOption.id)
         return {
           ...normalizedOption,
-          selected
+          selected: selectedCount > 0,
+          selectedCount
         }
       })
     }))
@@ -338,6 +359,31 @@ Page({
     })
 
     return selectedOptions
+  },
+
+  buildTagLabels(dish, selectedTags) {
+    const labels = []
+    const tags = (dish && dish.tags) || []
+
+    tags.forEach(tag => {
+      const selectedValue = selectedTags[tag.id]
+      const selectedIds = Array.isArray(selectedValue) ? selectedValue : (selectedValue ? [selectedValue] : [])
+      const countMap = {}
+      selectedIds.forEach(optionId => {
+        countMap[optionId] = (countMap[optionId] || 0) + 1
+      })
+      Object.keys(countMap).forEach(optionId => {
+        const count = countMap[optionId]
+        const option = (tag.options || []).map(item => this.normalizeTagOption(item)).find(item => item.id === optionId)
+        if (option) {
+          const countText = count > 1 ? ` x${count}` : ''
+          const totalExtra = (Number(option.price) || 0) * count
+          labels.push(`${tag.name}: ${option.name}${countText}${formatTagLabelSuffix(totalExtra)}`)
+        }
+      })
+    })
+
+    return labels
   },
 
   calculateUnitPrice(dish, selectedTags) {
@@ -387,7 +433,7 @@ Page({
     
     // 转换标签为可显示的数组
     const selectedOptions = this.getSelectedOptionList(currentDish, selectedTags)
-    const tagLabels = selectedOptions.map(option => `${option.name}${option.price > 0 ? ' +¥' + option.price : ''}`)
+    const tagLabels = this.buildTagLabels(currentDish, selectedTags)
     const unitPrice = this.calculateUnitPrice(currentDish, selectedTags)
     
     if (cart[cartKey]) {
@@ -442,7 +488,8 @@ Page({
 
   // 从菜品列表直接添加到购物车（无标签版本）
   addDishToCartDirect(e) {
-    const goods = e.currentTarget.dataset.goods
+    const goods = this.getGoodsFromEvent(e)
+    if (!goods || !goods._id) return
     
     // 如果菜品没有标签，直接添加（使用菜品ID作为key）
     if (!goods.tags || goods.tags.length === 0) {
@@ -477,7 +524,9 @@ Page({
 
   // 从菜品列表减少数量（无标签版本）
   reduceDishFromCart(e) {
-    const goods = e.currentTarget.dataset.goods
+    const goods = this.getGoodsFromEvent(e)
+    if (!goods || !goods._id) return
+
     const cart = { ...this.data.cart }
     const cartKey = goods._id
     
@@ -545,7 +594,7 @@ Page({
     this.updateModalPriceAndOptions(selectedTags)
   },
 
-  // 切换标签选项（多选）
+  // 多选标签：每次点击增加一份（同一加料可选多份）
   toggleTagOption(e) {
     const { tagId, optionId } = e.currentTarget.dataset
     
@@ -554,30 +603,40 @@ Page({
       return
     }
     
-    // 深拷贝，确保不修改原数据
     const selectedTags = JSON.parse(JSON.stringify(this.data.selectedTags || {}))
     
-    // 确保 tagId 对应的值是数组
     if (!selectedTags[tagId]) {
       selectedTags[tagId] = []
     } else if (!Array.isArray(selectedTags[tagId])) {
-      // 如果是字符串或其他类型，转为数组
       selectedTags[tagId] = [selectedTags[tagId]]
     }
     
-    // 创建新数组，避免直接修改
-    const tagArray = [...selectedTags[tagId]]
-    const index = tagArray.indexOf(optionId)
+    selectedTags[tagId] = [...selectedTags[tagId], optionId]
+    this.updateModalPriceAndOptions(selectedTags)
+  },
+
+  // 多选标签：减少一份
+  reduceTagOption(e) {
+    const { tagId, optionId } = e.currentTarget.dataset
+    
+    if (!tagId || !optionId) return
+    
+    const selectedTags = JSON.parse(JSON.stringify(this.data.selectedTags || {}))
+    const tagArray = Array.isArray(selectedTags[tagId])
+      ? [...selectedTags[tagId]]
+      : (selectedTags[tagId] ? [selectedTags[tagId]] : [])
+    const index = tagArray.lastIndexOf(optionId)
     
     if (index > -1) {
-      // 已选中，移除
       tagArray.splice(index, 1)
-    } else {
-      // 未选中，添加
-      tagArray.push(optionId)
     }
     
-    selectedTags[tagId] = tagArray
+    if (tagArray.length === 0) {
+      delete selectedTags[tagId]
+    } else {
+      selectedTags[tagId] = tagArray
+    }
+    
     this.updateModalPriceAndOptions(selectedTags)
   },
 

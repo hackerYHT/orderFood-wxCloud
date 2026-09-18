@@ -1,4 +1,5 @@
 <!--pages/admin/dish/dish.wxml-->
+<wxs module="priceHelper" src="../../../utils/priceHelper.wxs"></wxs>
 <view class="page">
   <!-- 主内容区 -->
   <view class="main-content">
@@ -63,6 +64,7 @@
               {{item.status === 1 ? '下架' : '上架'}}
             </view>
             <view class="action-btn edit" bindtap="showEditDishModal" data-dish="{{item}}">编辑</view>
+            <view class="action-btn copy" bindtap="showCopyDishModal" data-dish="{{item}}">复制</view>
             <view class="action-btn delete" bindtap="deleteDish" data-dish="{{item}}">删除</view>
           </view>
         </view>
@@ -204,7 +206,7 @@
                 </view>
                 <view class="tag-options">
                   <text class="option-item" wx:for="{{item.options}}" wx:key="index" wx:for-item="option">
-                    {{option.name || option}}{{option.price > 0 ? ' +¥' + option.price : ''}}{{option.defaultSelected ? ' 默认' : ''}}
+                    {{option.name || option}}{{option.price > 0 ? priceHelper.formatTagLabelSuffix(option.price) : ''}}{{option.defaultSelected ? ' 默认' : ''}}
                   </text>
                 </view>
               </view>
@@ -216,6 +218,36 @@
       <view class="modal-footer">
         <view class="modal-btn cancel" bindtap="closeDishModal">取消</view>
         <view class="modal-btn confirm" bindtap="saveDish">保存</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 复制菜品弹窗 -->
+  <view class="modal-mask" wx:if="{{showCopyDishModal}}" catchtap="closeCopyDishModal">
+    <view class="modal-dialog" catchtap="stopPropagation">
+      <view class="modal-title">复制菜品</view>
+      <view class="modal-content">
+        <view class="form-item">
+          <view class="form-label">源菜品</view>
+          <view class="copy-source-name">{{copySourceDish.name}}</view>
+        </view>
+        <view class="form-item">
+          <view class="form-label">目标分类</view>
+          <picker
+            mode="selector"
+            range="{{categories}}"
+            range-key="name"
+            value="{{copyCategoryIndex}}"
+            bindchange="onCopyCategoryChange">
+            <view class="form-input picker-input">
+              {{categories[copyCategoryIndex].name || '请选择分类'}}
+            </view>
+          </picker>
+        </view>
+      </view>
+      <view class="modal-footer">
+        <view class="modal-btn cancel" bindtap="closeCopyDishModal">取消</view>
+        <view class="modal-btn confirm" bindtap="confirmCopyDish">确认复制</view>
       </view>
     </view>
   </view>
@@ -264,7 +296,7 @@
                 <view class="option-dish-image placeholder" wx:else>无图</view>
                 <view>
                   <view class="option-text">{{item.name || item}}</view>
-                  <view class="option-price">+¥{{item.price || 0}}</view>
+                  <view class="option-price" wx:if="{{item.price > 0}}">{{priceHelper.formatTagOptionPrice(item.price)}}</view>
                 </view>
               </view>
               <view class="option-actions">
@@ -286,7 +318,7 @@
               <view class="dish-option-image placeholder" wx:else>无图</view>
               <view class="dish-option-info">
                 <view class="dish-option-name">{{item.name}}</view>
-                <view class="dish-option-price">+¥{{item.price || 0}}</view>
+                <view class="dish-option-price" wx:if="{{item.price > 0}}">{{priceHelper.formatTagOptionPrice(item.price)}}</view>
               </view>
               <view class="dish-option-check">{{item.optionDisabled ? '当前菜品' : (item.optionSelected ? '已选' : '选择')}}</view>
             </view>

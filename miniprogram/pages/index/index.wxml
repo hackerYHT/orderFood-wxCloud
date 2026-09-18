@@ -1,4 +1,5 @@
 <!--pages/index/index.wxml-->
+<wxs module="priceHelper" src="../../utils/priceHelper.wxs"></wxs>
 <view class="page">
   <!-- 状态栏占位 -->
   <view class="status-bar" style="height: {{statusBarHeight}}px;"></view>
@@ -45,11 +46,11 @@
               <text class="price-original" wx:if="{{item.originalPrice && item.originalPrice > 0}}">¥{{item.originalPrice}}</text>
             </view>
             <view class="goods-actions">
-              <view class="action-btn reduce" wx:if="{{item.cartCount > 0}}" bindtap="reduceDishFromCart" data-goods="{{item}}">
+              <view class="action-btn reduce" wx:if="{{item.cartCount > 0}}" bindtap="reduceDishFromCart" data-id="{{item._id}}">
                 <text>-</text>
               </view>
               <view class="goods-count" wx:if="{{item.cartCount > 0}}">{{item.cartCount}}</view>
-              <view class="action-btn add" bindtap="addDishToCartDirect" data-goods="{{item}}">
+              <view class="action-btn add" bindtap="addDishToCartDirect" data-id="{{item._id}}">
                 <text>+</text>
               </view>
             </view>
@@ -156,43 +157,55 @@
         </view>
 
         <!-- 标签选择 -->
-        <view class="tag-section" wx:if="{{currentDish.tags && currentDish.tags.length > 0}}" wx:for="{{currentDish.tags}}" wx:key="id" wx:for-item="tag">
-          <view class="tag-title">
-            {{tag.name}}
-            <text class="tag-type-label">{{tag.type === 'single' ? '(单选)' : '(多选)'}}</text>
-            <text class="tag-required-label" wx:if="{{tag.required}}">必选</text>
-          </view>
-          
-          <!-- 单选 -->
-          <view class="tag-options" wx:if="{{tag.type === 'single'}}">
-            <view 
-              class="tag-option {{option.selected ? 'selected' : ''}}"
-              wx:for="{{tag.options}}"
-              wx:key="index"
-              wx:for-item="option"
-              bindtap="selectTagOption"
-              data-tag-id="{{tag.id}}"
-              data-option-id="{{option.id}}">
-              <text>{{option.name}}</text>
-              <text class="tag-option-price" wx:if="{{option.price > 0}}">+¥{{option.price}}</text>
+        <block wx:for="{{currentDish.tags}}" wx:key="id" wx:for-item="tag">
+          <view class="tag-section">
+            <view class="tag-title">
+              {{tag.name}}
+              <text class="tag-type-label">{{tag.type === 'single' ? '(单选)' : '(多选)'}}</text>
+              <text class="tag-required-label" wx:if="{{tag.required}}">必选</text>
             </view>
-          </view>
+            
+            <!-- 单选 -->
+            <view class="tag-options" wx:if="{{tag.type === 'single'}}">
+              <view 
+                class="tag-option {{option.selected ? 'selected' : ''}}"
+                wx:for="{{tag.options}}"
+                wx:key="id"
+                wx:for-item="option"
+                bindtap="selectTagOption"
+                data-tag-id="{{tag.id}}"
+                data-option-id="{{option.id || option.dishId}}">
+                <text>{{option.name}}</text>
+                <text class="tag-option-price" wx:if="{{option.price > 0}}">{{priceHelper.formatTagOptionPrice(option.price)}}</text>
+              </view>
+            </view>
 
-          <!-- 多选 -->
-          <view class="tag-options" wx:if="{{tag.type === 'multiple'}}">
-            <view 
-              wx:for="{{tag.options}}"
-              wx:key="index"
-              wx:for-item="option"
-              class="tag-option {{option.selected ? 'selected' : ''}}"
-              bindtap="toggleTagOption"
-              data-tag-id="{{tag.id}}"
-              data-option-id="{{option.id}}">
-              <text>{{option.name}}</text>
-              <text class="tag-option-price" wx:if="{{option.price > 0}}">+¥{{option.price}}</text>
+            <!-- 多选（可重复选同一加料） -->
+            <view class="tag-options" wx:if="{{tag.type === 'multiple'}}">
+              <view 
+                wx:for="{{tag.options}}"
+                wx:key="id"
+                wx:for-item="option"
+                class="tag-option {{option.selectedCount > 0 ? 'selected' : ''}}">
+                <view
+                  class="tag-option-main"
+                  bindtap="toggleTagOption"
+                  data-tag-id="{{tag.id}}"
+                  data-option-id="{{option.id || option.dishId}}">
+                  <text>{{option.name}}</text>
+                  <text class="tag-option-count" wx:if="{{option.selectedCount > 0}}">x{{option.selectedCount}}</text>
+                  <text class="tag-option-price" wx:if="{{option.price > 0}}">{{priceHelper.formatTagOptionPrice(option.price)}}</text>
+                </view>
+                <view
+                  class="tag-option-reduce"
+                  wx:if="{{option.selectedCount > 0}}"
+                  catchtap="reduceTagOption"
+                  data-tag-id="{{tag.id}}"
+                  data-option-id="{{option.id || option.dishId}}">-</view>
+              </view>
             </view>
           </view>
-        </view>
+        </block>
 
         <!-- 数量选择 -->
         <view class="quantity-section">
