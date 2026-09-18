@@ -936,7 +936,7 @@ Page({
   // 分享功能
   onShareAppMessage() {
     return {
-      title: this.data.shopInfo.name || '老叶原汤手工拉面',
+      title: this.data.shopInfo.name || '红星面馆',
       path: '/pages/index/index',
       imageUrl: '' // 可以设置分享图片，留空则使用小程序默认图片
     }
@@ -945,7 +945,7 @@ Page({
   // 分享到朋友圈
   onShareTimeline() {
     return {
-      title: this.data.shopInfo.name || '老叶原汤手工拉面',
+      title: this.data.shopInfo.name || '红星面馆',
       query: '',
       imageUrl: '' // 可以设置分享图片，留空则使用小程序默认图片
     }

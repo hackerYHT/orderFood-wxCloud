@@ -9,9 +9,10 @@ const db = cloud.database({
   throwOnNotFound: false
 })
 const _ = db.command
+const SHOP_NAME = '红星面馆'
 
 // 生成打印内容
-function generatePrintContent(order, shopInfo) {
+function generatePrintContent(order) {
   const orderTypeText = order.orderType === 'dineIn' ? '堂食' : '打包'
   
   // 处理时间：如果 createTime 是服务器时间对象，需要特殊处理
@@ -89,7 +90,7 @@ function generatePrintContent(order, shopInfo) {
   content += `<C></C><BR>`
   content += `<C></C><BR>`
   content += `<C><font# bolder=1 height=2 width=2>${orderTypeText}订单</font#></C><BR>`
-  content += `<C><font# bolder=1 height=2 width=2>${escapeHtml(shopInfo?.name || '老叶原汤手工拉面')}</font#></C><BR>`
+  content += `<C><font# bolder=1 height=2 width=2>${SHOP_NAME}</font#></C><BR>`
   content += `<BR>`
   
   // 订单编号和时间
@@ -196,12 +197,8 @@ async function printOrderAsync(orderId, orderData) {
     
     const printer = printerRes.data[0]
     
-    // 2. 查询店铺信息
-    const shopRes = await db.collection('shopInfo').limit(1).get()
-    const shopInfo = shopRes.data && shopRes.data.length > 0 ? shopRes.data[0] : null
-    
-    // 3. 生成打印内容
-    const printContent = generatePrintContent(orderData, shopInfo)
+    // 2. 生成打印内容
+    const printContent = generatePrintContent(orderData)
     
     // 4. 调用打印接口
     // 根据订单类型设置播报音源：16-堂食订单，19-打包订单

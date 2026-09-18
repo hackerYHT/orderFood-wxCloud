@@ -305,9 +305,7 @@ Page({
     try {
       wx.showLoading({ title: '打印中...' })
 
-      // 查询店铺信息
-      const shopRes = await db.collection('shopInfo').limit(1).get()
-      const shopInfo = shopRes.data && shopRes.data.length > 0 ? shopRes.data[0] : null
+      const SHOP_NAME = '红星面馆'
 
       // 生成测试打印内容（模仿 doBuy/index.js 的格式）
       const formatDate = (d) => {
@@ -386,7 +384,7 @@ Page({
       }
       
       const orderTypeText = testOrder.orderType === 'dineIn' ? '堂食' : '打包'
-      const shopName = escapeHtml(shopInfo?.name || '老叶原汤手工拉面')
+      const shopName = SHOP_NAME
       const buildGoodsLines = (withPrice) => {
         let lines = ''
         if (testOrder.goods && testOrder.goods.length > 0) {

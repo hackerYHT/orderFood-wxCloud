@@ -6,6 +6,7 @@ cloud.init({
 
 const db = cloud.database()
 const PACKAGING_FEE = 1
+const SHOP_NAME = '红星面馆'
 
 const getStringWidth = (str) => {
   if (!str) return 0
@@ -48,8 +49,28 @@ const formatDate = (d) => {
   return `${beijingTime.getUTCFullYear()}-${pad(beijingTime.getUTCMonth() + 1)}-${pad(beijingTime.getUTCDate())} ${pad(beijingTime.getUTCHours())}:${pad(beijingTime.getUTCMinutes())}`
 }
 
+const TAG_PRICE_SUFFIX = /\s\+(\d+(?:\.\d+)?)元$/
+
+const getItemBasePrice = (item) => {
+  if (item.basePrice != null && item.basePrice !== '') {
+    return Number(item.basePrice) || 0
+  }
+  const unitPrice = Number(item.price) || 0
+  const extraPrice = Number(item.extraPrice) || 0
+  return extraPrice > 0 ? Math.max(0, unitPrice - extraPrice) : unitPrice
+}
+
+const appendAlignedLine = (leftText, rightPart, fontHeight = 1) => {
+  const leftWidth = getStringWidth(leftText)
+  const rightWidth = getStringWidth(rightPart)
+  const totalWidth = 31
+  const spacesNeeded = totalWidth - leftWidth - rightWidth
+  const spaces = spacesNeeded > 0 ? generateSpaces(spacesNeeded) : ' '
+  return `<LEFT><font# bolder=0 height=${fontHeight} width=1>${leftText}${spaces}${rightPart}</font#></LEFT><BR>`
+}
+
 // ticketType: 'front' 前台（含价格） | 'kitchen' 后厨（无价格）
-function generatePrintContent(order, shopInfo, ticketType = 'front') {
+function generatePrintContent(order, ticketType = 'front') {
   const isKitchen = ticketType === 'kitchen'
   const orderTypeText = order.orderType === 'dineIn' ? '堂食' : '打包'
   const date = getOrderDate(order)
@@ -61,7 +82,7 @@ function generatePrintContent(order, shopInfo, ticketType = 'front') {
   } else {
     content += `<C><font# bolder=1 height=2 width=2>前台·${orderTypeText}订单</font#></C><BR>`
   }
-  content += `<C><font# bolder=1 height=2 width=2>${escapeHtml(shopInfo?.name || '老叶原汤手工拉面')}</font#></C><BR>`
+  content += `<C><font# bolder=1 height=2 width=2>${SHOP_NAME}</font#></C><BR>`
   content += `<C>--------------------------------</C><BR>`
   content += `<LEFT>订单编号: ${escapeHtml(order._id)}</LEFT><BR>`
   content += `<LEFT>下单时间: ${formatDate(date)}</LEFT><BR>`
@@ -84,20 +105,25 @@ function generatePrintContent(order, shopInfo, ticketType = 'front') {
     order.goods.forEach(item => {
       const dishName = escapeHtml(item.dishName || item.goodsName || '未知菜品')
       const count = item.count || 1
+      const basePrice = getItemBasePrice(item)
       const rightPart = isKitchen
         ? `×${count}`
-        : `×${count}  ￥${parseFloat(item.price || 0).toFixed(2)}`
-      const dishNameWidth = getStringWidth(dishName)
-      const rightPartWidth = getStringWidth(rightPart)
-      const totalWidth = 31
-      const spacesNeeded = totalWidth - dishNameWidth - rightPartWidth
-      const spaces = spacesNeeded > 0 ? generateSpaces(spacesNeeded) : ' '
-      const fontHeight = isKitchen ? 2 : 1
-      content += `<LEFT><font# bolder=0 height=${fontHeight} width=1>${dishName}${spaces}${rightPart}</font#></LEFT><BR>`
+        : `×${count}  ￥${basePrice.toFixed(2)}`
+      content += appendAlignedLine(dishName, rightPart, 2)
 
       if (item.tags && Array.isArray(item.tags) && item.tags.length > 0) {
-        const tagsText = item.tags.map(tag => escapeHtml(tag)).join('<BR>')
-        content += `<LEFT><font# bolder=0 height=1 width=1>  ${tagsText}</font#></LEFT><BR>`
+        item.tags.forEach(tagStr => {
+          const raw = String(tagStr)
+          const priceMatch = raw.match(TAG_PRICE_SUFFIX)
+          const tagPrice = priceMatch ? parseFloat(priceMatch[1]) : 0
+          const tagLabel = escapeHtml(priceMatch ? raw.slice(0, priceMatch.index).trim() : raw)
+          if (isKitchen) {
+            content += appendAlignedLine(`  ${tagLabel}`, '', 1)
+          } else {
+            const tagRight = tagPrice > 0 ? `  ￥${tagPrice.toFixed(2)}` : ''
+            content += appendAlignedLine(`  ${tagLabel}`, tagRight, 1)
+          }
+        })
       }
     })
   }
@@ -149,12 +175,10 @@ async function printOrder(orderId, orderData) {
     }
 
     const printer = printerRes.data[0]
-    const shopRes = await db.collection('shopInfo').limit(1).get()
-    const shopInfo = shopRes.data && shopRes.data.length > 0 ? shopRes.data[0] : null
     const voice = orderData.orderType === 'dineIn' ? '16' : '19'
 
-    const kitchenContent = generatePrintContent(orderData, shopInfo, 'kitchen')
-    const frontContent = generatePrintContent(orderData, shopInfo, 'front')
+    const kitchenContent = generatePrintContent(orderData, 'kitchen')
+    const frontContent = generatePrintContent(orderData, 'front')
 
     const kitchenRes = await callPrintNote(printer, {
       content: kitchenContent,
