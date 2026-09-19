@@ -9,6 +9,7 @@
     "pages/admin/dish/dish",
     "pages/admin/tagBatch/tagBatch",
     "pages/admin/order/order",
+    "pages/admin/stats/stats",
     "pages/admin/notice/notice",
     "pages/admin/shopInfo/shopInfo",
     "pages/admin/tableCode/tableCode",

@@ -39,6 +39,13 @@ Page({
     })
   },
 
+  // 营业统计
+  goToStats() {
+    wx.navigateTo({
+      url: '/pages/admin/stats/stats'
+    })
+  },
+
   // 公告管理
   goToNotice() {
     wx.navigateTo({

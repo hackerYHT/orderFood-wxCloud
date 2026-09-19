@@ -1,0 +1,92 @@
+<!--pages/admin/stats/stats.wxml-->
+<view class="page">
+  <view class="range-section">
+    <view class="section-title">统计时段</view>
+    <view class="range-tabs">
+      <view
+        class="range-tab {{rangeKey === item.key ? 'active' : ''}}"
+        wx:for="{{rangeOptions}}"
+        wx:key="key"
+        data-key="{{item.key}}"
+        bindtap="onRangeChange"
+      >
+        {{item.label}}
+      </view>
+    </view>
+
+    <view class="custom-range" wx:if="{{rangeKey === 'custom'}}">
+      <picker mode="date" value="{{customStartDate}}" bindchange="onCustomStartChange">
+        <view class="date-picker">
+          <text class="date-label">开始</text>
+          <text class="date-value">{{customStartDate}}</text>
+        </view>
+      </picker>
+      <text class="date-sep">至</text>
+      <picker mode="date" value="{{customEndDate}}" bindchange="onCustomEndChange">
+        <view class="date-picker">
+          <text class="date-label">结束</text>
+          <text class="date-value">{{customEndDate}}</text>
+        </view>
+      </picker>
+    </view>
+
+    <view class="range-hint">当前：{{rangeLabel}}</view>
+  </view>
+
+  <view class="summary-section">
+    <view class="section-title">营业概览</view>
+    <view class="summary-grid">
+      <view class="summary-card primary">
+        <view class="card-value">{{orderCount}}</view>
+        <view class="card-label">订单数</view>
+      </view>
+      <view class="summary-card">
+        <view class="card-value">¥{{totalSalesText}}</view>
+        <view class="card-label">总营业额</view>
+      </view>
+      <view class="summary-card success">
+        <view class="card-value">¥{{paidAmountText}}</view>
+        <view class="card-label">已付 {{paidCount}} 单</view>
+      </view>
+      <view class="summary-card warning">
+        <view class="card-value">¥{{unpaidAmountText}}</view>
+        <view class="card-label">未付 {{unpaidCount}} 单</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="type-section">
+    <view class="section-title">堂食 / 打包</view>
+    <view class="type-grid">
+      <view class="type-card">
+        <view class="type-icon">🍽️</view>
+        <view class="type-info">
+          <view class="type-count">{{dineInCount}} 单</view>
+          <view class="type-amount">¥{{dineInAmountText}}</view>
+        </view>
+      </view>
+      <view class="type-card">
+        <view class="type-icon">📦</view>
+        <view class="type-info">
+          <view class="type-count">{{takeOutCount}} 单</view>
+          <view class="type-amount">¥{{takeOutAmountText}}</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="dish-section">
+    <view class="section-title">菜品销量排行</view>
+    <view class="dish-list" wx:if="{{topDishes.length > 0}}">
+      <view class="dish-item" wx:for="{{topDishes}}" wx:key="name">
+        <view class="dish-rank rank-{{item.rank <= 3 ? item.rank : 'other'}}">{{item.rank}}</view>
+        <view class="dish-main">
+          <view class="dish-name">{{item.name}}</view>
+          <view class="dish-meta">销量 {{item.count}} 份 · ¥{{item.amountText}}</view>
+        </view>
+        <view class="dish-count">×{{item.count}}</view>
+      </view>
+    </view>
+    <van-empty wx:else description="该时段暂无订单" />
+  </view>
+</view>

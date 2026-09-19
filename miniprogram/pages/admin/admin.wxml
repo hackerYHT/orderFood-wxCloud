@@ -25,6 +25,12 @@
         bind:click="goToOrder"
       />
       <van-grid-item 
+        icon="chart-trending-o" 
+        icon-color="#e54d42"
+        text="营业统计" 
+        bind:click="goToStats"
+      />
+      <van-grid-item 
         icon="volume-o" 
         icon-color="#ffd700"
         text="公告管理" 
