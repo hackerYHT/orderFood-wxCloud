@@ -5,6 +5,19 @@
     <text class="page-subtitle">店员口头点餐提交后自动生成</text>
   </view>
 
+  <view class="tabs">
+    <view
+      class="tab-item {{payFilter === index ? 'active' : ''}}"
+      wx:for="{{payFilterOptions}}"
+      wx:key="index"
+      data-index="{{index}}"
+      bindtap="onPayFilterChange"
+    >
+      <text class="tab-text">{{item}}</text>
+      <view class="tab-line" wx:if="{{payFilter === index}}"></view>
+    </view>
+  </view>
+
   <view class="order-list">
     <view class="order-item" wx:for="{{orderList}}" wx:key="_id">
       <view class="order-header">
@@ -51,6 +64,14 @@
           <view class="order-table-code" wx:if="{{item.tableNumber}}">桌号：{{item.tableNumber}}</view>
         </view>
         <view class="order-actions">
+          <view
+            class="action-btn pay-toggle {{item.pay_status ? 'paid' : 'unpaid'}}"
+            data-id="{{item._id}}"
+            data-status="{{item.pay_status}}"
+            catchtap="togglePayStatus"
+          >
+            {{item.pay_status ? '改为未支付' : '改为已支付'}}
+          </view>
           <view class="order-price">
             <text class="price-label">合计：</text>
             <text class="price-num">¥{{item.finalPrice}}</text>

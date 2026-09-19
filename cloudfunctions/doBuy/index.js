@@ -133,8 +133,8 @@ function generatePrintContent(order, ticketType = 'front') {
     content += `<C>--------------------------------</C><BR>`
   }
   const ticketLabel = isKitchen ? '后厨' : '前台'
-  content += `<C><font# bolder=1 height=2 width=2>${ticketLabel}·${orderTypeText}订单</font#></C><BR>`
   content += `<C><font# bolder=1 height=2 width=2>${SHOP_NAME}</font#></C><BR>`
+  content += `<C><font# bolder=1 height=2 width=2>${ticketLabel}·${orderTypeText}订单</font#></C><BR>`
   content += `<C>--------------------------------</C><BR>`
 
   if (order.tableNumber) {
@@ -190,6 +190,15 @@ function generatePrintContent(order, ticketType = 'front') {
   return content
 }
 
+// 大趋 print 的 voice 仅支持预设音源代码（16堂食/19打包），中文文本会被当成小票内容打印
+function buildOrderTypeVoice(orderType) {
+  return orderType === 'dineIn' ? '16' : '19'
+}
+
+function buildPayInVoiceText(finalPrice) {
+  return (Number(finalPrice) || 0).toFixed(2)
+}
+
 async function callPrintNote(printer, { content, outTradeNo, voice }) {
   const data = {
     $url: 'printNote',
@@ -210,6 +219,18 @@ async function callPrintNote(printer, { content, outTradeNo, voice }) {
   })
 }
 
+async function callPayInVoice(printer, { text, outTradeNo }) {
+  return cloud.callFunction({
+    name: 'printManage',
+    data: {
+      $url: 'payInVoice',
+      sn: printer.sn,
+      text,
+      outTradeNo
+    }
+  })
+}
+
 async function printOrder(orderId, orderData) {
   try {
     const printerRes = await db.collection('printer').limit(1).get()
@@ -219,7 +240,6 @@ async function printOrder(orderId, orderData) {
     }
 
     const printer = printerRes.data[0]
-    const voice = orderData.orderType === 'dineIn' ? '16' : '19'
 
     const kitchenContent = generatePrintContent(orderData, 'kitchen')
     const frontContent = generatePrintContent(orderData, 'front')
@@ -227,7 +247,7 @@ async function printOrder(orderId, orderData) {
     const kitchenRes = await callPrintNote(printer, {
       content: kitchenContent,
       outTradeNo: `${orderId}_kitchen`,
-      voice
+      voice: buildOrderTypeVoice(orderData.orderType)
     })
     const frontRes = await callPrintNote(printer, {
       content: frontContent,
@@ -238,6 +258,17 @@ async function printOrder(orderId, orderData) {
     const frontOk = frontRes.result && frontRes.result.success
 
     if (kitchenOk && frontOk) {
+      try {
+        const voiceRes = await callPayInVoice(printer, {
+          text: buildPayInVoiceText(orderData.finalPrice),
+          outTradeNo: `${orderId}_voice`
+        })
+        if (!(voiceRes.result && voiceRes.result.success)) {
+          console.warn('合计金额语音播报失败', voiceRes.result)
+        }
+      } catch (voiceErr) {
+        console.warn('合计金额语音播报异常', voiceErr)
+      }
       console.log('打印订单成功（前台+后厨）', { kitchen: kitchenRes.result, front: frontRes.result })
       return { printed: true }
     }

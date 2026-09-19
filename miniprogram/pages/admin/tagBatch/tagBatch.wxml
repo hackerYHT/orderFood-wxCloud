@@ -13,6 +13,12 @@
       data-tab="settings">
       标签属性设置
     </view>
+    <view
+      class="tab-item {{activeTab === 'defaults' ? 'active' : ''}}"
+      bindtap="switchTab"
+      data-tab="defaults">
+      批量设默认
+    </view>
   </view>
 
   <view class="loading-tip" wx:if="{{loading}}">加载中...</view>
@@ -100,6 +106,34 @@
           <text class="meta-item">多选 {{item.multipleCount}}</text>
         </view>
         <view class="tag-stat-action">点击批量编辑 →</view>
+      </view>
+
+      <van-empty wx:if="{{tagStats.length === 0}}" description="暂无标签，请先在菜品管理中添加" />
+    </view>
+  </view>
+
+  <!-- 批量设默认 -->
+  <view wx:if="{{!loading && activeTab === 'defaults'}}">
+    <view class="tip-bar">
+      <text class="tip-icon">ℹ️</text>
+      <text class="tip-text">选择标签后统一设置默认选项，如将「辣度」默认设为「微辣」。点餐时会自动预选该选项。若已在「批量添加/移除」中勾选菜品，可仅对所选菜品生效。</text>
+    </view>
+
+    <view class="tag-list">
+      <view
+        class="tag-stat-card"
+        wx:for="{{tagStats}}"
+        wx:key="removeKey"
+        bindtap="openDefaultEdit"
+        data-key="{{item.removeKey}}">
+        <view class="tag-stat-header">
+          <view class="tag-stat-title-wrap">
+            <text class="tag-stat-name">{{item.name}}</text>
+            <text class="tag-badge" wx:if="{{item.isCategoryRef}}">分类动态</text>
+          </view>
+          <text class="tag-stat-count">{{item.dishCount}} 个菜品</text>
+        </view>
+        <view class="tag-stat-action">点击设置默认选项 →</view>
       </view>
 
       <van-empty wx:if="{{tagStats.length === 0}}" description="暂无标签，请先在菜品管理中添加" />
@@ -202,6 +236,56 @@
       <view class="modal-footer">
         <view class="modal-btn cancel" bindtap="closeRemoveTagModal">取消</view>
         <view class="modal-btn confirm" bindtap="confirmRemoveTag">确认移除</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 批量设默认弹窗 -->
+  <view class="modal-mask" wx:if="{{showDefaultModal}}" catchtap="closeDefaultModal">
+    <view class="modal-dialog" catchtap="stopPropagation">
+      <view class="modal-title">设置默认「{{selectedTagName}}」</view>
+      <scroll-view class="modal-content" scroll-y>
+        <view class="form-item">
+          <view class="form-label">应用范围</view>
+          <view class="scope-selector">
+            <view
+              class="scope-option {{defaultApplyScope === 'all' ? 'active' : ''}}"
+              bindtap="setDefaultApplyScope"
+              data-scope="all">
+              全部菜品（{{affectedDishes.length}}）
+            </view>
+            <view
+              class="scope-option {{defaultApplyScope === 'selected' ? 'active' : ''}}"
+              bindtap="setDefaultApplyScope"
+              data-scope="selected"
+              wx:if="{{selectedDishIds.length > 0}}">
+              仅已选（{{selectedDishIds.length}}）
+            </view>
+          </view>
+        </view>
+
+        <view class="form-item">
+          <view class="form-label">默认选项</view>
+          <view class="default-option-list">
+            <view
+              class="default-option-item {{selectedDefaultKey === item.key ? 'active' : ''}}"
+              wx:for="{{defaultOptionCandidates}}"
+              wx:key="key"
+              bindtap="selectDefaultOption"
+              data-key="{{item.key}}">
+              <text class="default-option-name">{{item.label}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="form-note">
+          单选标签仅保留一个默认项；分类动态标签会按菜品 ID/名称匹配默认项。
+        </view>
+      </scroll-view>
+      <view class="modal-footer three-col">
+        <view class="modal-btn cancel" bindtap="closeDefaultModal">取消</view>
+        <view class="modal-btn secondary" bindtap="clearBatchDefault">清除默认</view>
+        <view class="modal-btn confirm" bindtap="applyBatchDefault">应用</view>
       </view>
     </view>
   </view>

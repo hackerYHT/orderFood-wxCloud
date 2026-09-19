@@ -8,7 +8,9 @@ Page({
     orderPage: 0,
     orderPageSize: 20,
     orderHasMore: true,
-    loadingOrders: false
+    loadingOrders: false,
+    payFilter: 0, // 0: 全部, 1: 未支付, 2: 已支付
+    payFilterOptions: ['全部', '未支付', '已支付']
   },
 
   onLoad() {
@@ -35,12 +37,20 @@ Page({
       const pageSize = this.data.orderPageSize
       const page = append ? this.data.orderPage + 1 : 0
       const skip = page * pageSize
+      const _ = db.command
+
+      const where = {
+        _openid: openid,
+        type: 'order'
+      }
+      if (this.data.payFilter === 1) {
+        where.pay_status = _.neq(true)
+      } else if (this.data.payFilter === 2) {
+        where.pay_status = true
+      }
 
       const res = await db.collection('order')
-        .where({
-          _openid: openid,
-          type: 'order'
-        })
+        .where(where)
         .orderBy('createTime', 'desc')
         .skip(skip)
         .limit(pageSize)
@@ -83,6 +93,57 @@ Page({
   onReachBottom() {
     if (this.data.orderHasMore && !this.data.loadingOrders) {
       this.loadOrders(true)
+    }
+  },
+
+  onPayFilterChange(e) {
+    const index = Number(e.currentTarget.dataset.index)
+    if (index === this.data.payFilter) {
+      return
+    }
+    this.setData({
+      payFilter: index,
+      orderPage: 0,
+      orderHasMore: true,
+      orderList: []
+    }, () => {
+      this.loadOrders()
+    })
+  },
+
+  async togglePayStatus(e) {
+    const { id, status } = e.currentTarget.dataset
+    if (!id) {
+      return
+    }
+
+    const currentPaid = status === true || status === 'true'
+    const newStatus = !currentPaid
+
+    wx.showLoading({ title: '更新中...' })
+    try {
+      await db.collection('order').doc(id).update({
+        data: { pay_status: newStatus }
+      })
+
+      let orderList = this.data.orderList.map(order => (
+        order._id === id ? { ...order, pay_status: newStatus } : order
+      ))
+
+      if ((this.data.payFilter === 1 && newStatus) || (this.data.payFilter === 2 && !newStatus)) {
+        orderList = orderList.filter(order => order._id !== id)
+      }
+
+      this.setData({ orderList })
+      wx.showToast({
+        title: newStatus ? '已标记为已支付' : '已标记为未支付',
+        icon: 'none'
+      })
+    } catch (err) {
+      console.error('更新支付状态失败', err)
+      wx.showToast({ title: '更新失败', icon: 'none' })
+    } finally {
+      wx.hideLoading()
     }
   }
 })

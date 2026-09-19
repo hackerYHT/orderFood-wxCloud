@@ -6,7 +6,8 @@ const {
   getTagRemoveKey,
   getTagDisplayLabel,
   mergeTagIntoDish,
-  removeTagByKey
+  removeTagByKey,
+  applyBatchDefaultToTag
 } = require('../../../utils/dishTags.js')
 
 Page({
@@ -43,7 +44,12 @@ Page({
 
     showRemoveTagModal: false,
     removableTags: [],
-    selectedRemoveKey: ''
+    selectedRemoveKey: '',
+
+    showDefaultModal: false,
+    defaultOptionCandidates: [],
+    selectedDefaultKey: '',
+    defaultApplyScope: 'all'
   },
 
   onLoad() {
@@ -569,6 +575,255 @@ Page({
         await this.doBatchUpdate()
       }
     })
+  },
+
+  buildDefaultOptionCandidates(stat) {
+    if (!stat) return []
+
+    const optionMap = {}
+
+    if (stat.isCategoryRef && stat.categoryId) {
+      this.data.allDishes
+        .filter(dish => dish.categoryId === stat.categoryId && dish.deleted !== true)
+        .forEach(dish => {
+          const key = dish._id
+          optionMap[key] = {
+            key,
+            dishId: dish._id,
+            name: dish.name || '',
+            label: dish.name || ''
+          }
+        })
+    } else {
+      stat.dishes.forEach(item => {
+        const tag = item.tag || {}
+        ;(tag.options || []).forEach(option => {
+          if (typeof option === 'string') {
+            const name = option.trim()
+            if (!name) return
+            const key = `name:${name}`
+            if (!optionMap[key]) {
+              optionMap[key] = {
+                key,
+                dishId: '',
+                name,
+                label: name
+              }
+            }
+            return
+          }
+
+          const dishId = option.dishId || option._id || ''
+          const name = option.name || option.dishName || ''
+          const key = dishId || `name:${name}`
+          if (!key || optionMap[key]) return
+
+          optionMap[key] = {
+            key,
+            dishId,
+            name,
+            label: name
+          }
+        })
+      })
+    }
+
+    return Object.values(optionMap).sort((a, b) => a.label.localeCompare(b.label, 'zh-CN'))
+  },
+
+  getCurrentDefaultKey(stat) {
+    if (!stat || !stat.dishes.length) return ''
+
+    const firstTag = stat.dishes[0].tag || {}
+    const defaultOption = (firstTag.options || []).find(option => option && option.defaultSelected === true)
+    if (!defaultOption) return ''
+
+    if (typeof defaultOption === 'string') {
+      return `name:${defaultOption}`
+    }
+
+    const dishId = defaultOption.dishId || defaultOption._id || ''
+    if (dishId) return dishId
+    const name = defaultOption.name || defaultOption.dishName || ''
+    return name ? `name:${name}` : ''
+  },
+
+  openDefaultEdit(e) {
+    const removeKey = e.currentTarget.dataset.key
+    const stat = this.data.tagStats.find(item => item.removeKey === removeKey)
+    if (!stat || stat.dishes.length === 0) return
+
+    const defaultOptionCandidates = this.buildDefaultOptionCandidates(stat)
+    if (!defaultOptionCandidates.length) {
+      wx.showToast({
+        title: '该标签暂无可用选项',
+        icon: 'none'
+      })
+      return
+    }
+
+    const currentDefaultKey = this.getCurrentDefaultKey(stat)
+    const hasSelectedDishes = this.data.selectedDishIds.length > 0
+
+    this.setData({
+      selectedTagName: stat.name,
+      showDefaultModal: true,
+      affectedDishes: stat.dishes,
+      defaultOptionCandidates,
+      selectedDefaultKey: currentDefaultKey || defaultOptionCandidates[0].key,
+      selectedRemoveKey: removeKey,
+      defaultApplyScope: hasSelectedDishes ? 'selected' : 'all'
+    })
+  },
+
+  closeDefaultModal() {
+    this.setData({ showDefaultModal: false })
+  },
+
+  selectDefaultOption(e) {
+    const key = e.currentTarget.dataset.key
+    this.setData({ selectedDefaultKey: key })
+  },
+
+  setDefaultApplyScope(e) {
+    const scope = e.currentTarget.dataset.scope
+    this.setData({ defaultApplyScope: scope })
+  },
+
+  getDefaultTargetDishes(stat) {
+    const { defaultApplyScope, selectedDishIds } = this.data
+    if (defaultApplyScope === 'selected' && selectedDishIds.length > 0) {
+      const selectedSet = new Set(selectedDishIds)
+      return stat.dishes.filter(item => selectedSet.has(item._id))
+    }
+    return stat.dishes
+  },
+
+  applyBatchDefault() {
+    const { selectedRemoveKey, selectedDefaultKey, defaultOptionCandidates, applying } = this.data
+    const stat = this.data.tagStats.find(item => item.removeKey === selectedRemoveKey)
+
+    if (!stat || !selectedDefaultKey || applying) return
+
+    const defaultCandidate = defaultOptionCandidates.find(item => item.key === selectedDefaultKey)
+    if (!defaultCandidate) return
+
+    const targetDishes = this.getDefaultTargetDishes(stat)
+    if (!targetDishes.length) {
+      wx.showToast({
+        title: '没有可更新的菜品',
+        icon: 'none'
+      })
+      return
+    }
+
+    wx.showModal({
+      title: '确认批量设默认',
+      content: `将为 ${targetDishes.length} 个菜品中的「${this.data.selectedTagName}」标签设置默认选项「${defaultCandidate.label}」`,
+      success: async (res) => {
+        if (!res.confirm) return
+        await this.doBatchDefaultUpdate(defaultCandidate, false)
+      }
+    })
+  },
+
+  clearBatchDefault() {
+    const { selectedRemoveKey, applying } = this.data
+    const stat = this.data.tagStats.find(item => item.removeKey === selectedRemoveKey)
+    if (!stat || applying) return
+
+    const targetDishes = this.getDefaultTargetDishes(stat)
+    if (!targetDishes.length) {
+      wx.showToast({
+        title: '没有可更新的菜品',
+        icon: 'none'
+      })
+      return
+    }
+
+    wx.showModal({
+      title: '确认清除默认',
+      content: `将清除 ${targetDishes.length} 个菜品中「${this.data.selectedTagName}」标签的默认选项`,
+      success: async (res) => {
+        if (!res.confirm) return
+        await this.doBatchDefaultUpdate(null, true)
+      }
+    })
+  },
+
+  async doBatchDefaultUpdate(defaultCandidate, clearDefault = false) {
+    const { selectedRemoveKey } = this.data
+    const stat = this.data.tagStats.find(item => item.removeKey === selectedRemoveKey)
+    if (!stat) return
+
+    const targetDishes = this.getDefaultTargetDishes(stat)
+    this.setData({ applying: true })
+    wx.showLoading({ title: '更新中...' })
+
+    let successCount = 0
+    let failCount = 0
+
+    try {
+      for (const item of targetDishes) {
+        try {
+          const dishRes = await db.collection('dish').doc(item._id).get()
+          const dish = dishRes.data
+          if (!dish || !Array.isArray(dish.tags)) {
+            failCount += 1
+            continue
+          }
+
+          let changed = false
+          const tags = dish.tags.map(tag => {
+            if (getTagRemoveKey(tag) !== selectedRemoveKey) {
+              return tag
+            }
+            changed = true
+            return applyBatchDefaultToTag(tag, defaultCandidate, clearDefault)
+          })
+
+          if (!changed) {
+            continue
+          }
+
+          await db.collection('dish').doc(item._id).update({
+            data: { tags }
+          })
+          successCount += 1
+        } catch (err) {
+          console.error('更新默认选项失败', item._id, err)
+          failCount += 1
+        }
+      }
+
+      wx.hideLoading()
+
+      if (failCount === 0) {
+        wx.showToast({
+          title: clearDefault
+            ? `已清除 ${successCount} 个菜品默认`
+            : `已更新 ${successCount} 个菜品`,
+          icon: 'success'
+        })
+      } else {
+        wx.showToast({
+          title: `成功 ${successCount}，失败 ${failCount}`,
+          icon: 'none'
+        })
+      }
+
+      this.closeDefaultModal()
+      await this.loadPageData()
+    } catch (err) {
+      wx.hideLoading()
+      console.error('批量设置默认失败', err)
+      wx.showToast({
+        title: '更新失败',
+        icon: 'none'
+      })
+    } finally {
+      this.setData({ applying: false })
+    }
   },
 
   async doBatchUpdate() {

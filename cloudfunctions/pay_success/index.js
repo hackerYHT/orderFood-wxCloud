@@ -185,6 +185,10 @@ function generatePrintContent(order) {
   return content
 }
 
+function buildPayInVoiceText(finalPrice) {
+  return (Number(finalPrice) || 0).toFixed(2)
+}
+
 // 异步打印订单（不阻塞主流程）
 async function printOrderAsync(orderId, orderData) {
   try {
@@ -200,16 +204,15 @@ async function printOrderAsync(orderId, orderData) {
     // 2. 生成打印内容
     const printContent = generatePrintContent(orderData)
     
-    // 4. 调用打印接口
-    // 根据订单类型设置播报音源：16-堂食订单，19-打包订单
     const voice = orderData.orderType === 'dineIn' ? '16' : '19'
-    
+
+    // 4. 调用打印接口
     const printRes = await cloud.callFunction({
       name: 'printManage',
       data: {
         $url: 'printNote',
         sn: printer.sn,
-        voice: voice,
+        voice,
         voicePlayTimes: 1,
         voicePlayInterval: 3,
         content: printContent,
@@ -221,6 +224,22 @@ async function printOrderAsync(orderId, orderData) {
     
     if (printRes.result && printRes.result.success) {
       console.log('打印订单成功', printRes.result)
+      try {
+        const voiceRes = await cloud.callFunction({
+          name: 'printManage',
+          data: {
+            $url: 'payInVoice',
+            sn: printer.sn,
+            text: buildPayInVoiceText(orderData.finalPrice),
+            outTradeNo: `${orderId}_voice`
+          }
+        })
+        if (!(voiceRes.result && voiceRes.result.success)) {
+          console.warn('合计金额语音播报失败', voiceRes.result)
+        }
+      } catch (voiceErr) {
+        console.warn('合计金额语音播报异常', voiceErr)
+      }
     } else {
       console.error('打印订单失败', printRes.result)
     }

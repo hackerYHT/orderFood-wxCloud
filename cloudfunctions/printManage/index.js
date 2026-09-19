@@ -288,6 +288,47 @@ exports.main = async (event, context) => {
     }
   })
 
+  // 播报收银语音（不打印小票）
+  app.router('payInVoice', async (ctx, next) => {
+    const { sn, text } = ctx.event
+    const uid = getNonceStr()
+    const time = new Date().getTime()
+    const body = { sn, text }
+
+    try {
+      const result = await request({
+        url: baseUrl + '/openapi/payInVoice',
+        method: 'POST',
+        data: body,
+        headers: {
+          'Content-Type': 'application/json;charset=UTF-8',
+          'appid': appid,
+          'uid': uid,
+          'stime': time,
+          'sign': getSign(uid, time, appid, body)
+        }
+      })
+      if (isApiSuccess(result)) {
+        ctx.body = { success: true, data: result }
+      } else {
+        ctx.body = {
+          success: false,
+          error: result.message || result.msg || '语音播报失败',
+          code: result.code,
+          data: result
+        }
+      }
+    } catch (error) {
+      console.error('语音播报失败', error)
+      ctx.body = {
+        success: false,
+        error: error.message || '语音播报失败',
+        code: error.code,
+        data: error.data
+      }
+    }
+  })
+
   // 打印小票
   app.router('printNote', async (ctx, next) => {
     const { $url, ...printData } = ctx.event

@@ -19,14 +19,43 @@ function buildCategoryRefTag({ categoryId, categoryName, name, type = 'single', 
   }
 }
 
-function dishToTagOption(dish) {
+function dishToTagOption(dish, defaultSelected = false) {
   return {
     dishId: dish._id,
     name: dish.name || '',
     price: Number(dish.price) || 0,
     image: dish.image || '',
-    defaultSelected: false
+    defaultSelected: defaultSelected === true
   }
+}
+
+function getOptionMatchKey(option) {
+  if (!option) return ''
+  if (typeof option === 'string') {
+    const name = option.trim()
+    return name ? `name:${name}` : ''
+  }
+  const dishId = option.dishId || option._id || ''
+  if (dishId) return `dishId:${dishId}`
+  const name = (option.name || option.dishName || '').trim()
+  return name ? `name:${name}` : ''
+}
+
+function buildDefaultKeySet(options = []) {
+  const keys = new Set()
+  ;(options || []).forEach(option => {
+    if (option && option.defaultSelected === true) {
+      const key = getOptionMatchKey(option)
+      if (key) keys.add(key)
+    }
+  })
+  return keys
+}
+
+function isOptionDefault(option, defaultKeys) {
+  if (!defaultKeys || defaultKeys.size === 0) return false
+  const key = getOptionMatchKey(option)
+  return key ? defaultKeys.has(key) : false
 }
 
 function expandCategoryRefTag(tag, categoryDishesMap = {}) {
@@ -35,7 +64,96 @@ function expandCategoryRefTag(tag, categoryDishesMap = {}) {
   }
 
   const dishes = categoryDishesMap[tag.categoryId] || []
-  const options = dishes.map(dish => dishToTagOption(dish))
+  const defaultKeys = buildDefaultKeySet(tag.options || [])
+  const options = dishes.map(dish => {
+    const dishOption = {
+      dishId: dish._id,
+      name: dish.name || ''
+    }
+    return dishToTagOption(dish, isOptionDefault(dishOption, defaultKeys))
+  })
+
+  return {
+    ...tag,
+    options
+  }
+}
+
+function applyBatchDefaultToTag(tag, defaultCandidate, clearDefault = false) {
+  if (!tag) return tag
+
+  if (isCategoryRefTag(tag)) {
+    if (clearDefault) {
+      return {
+        ...tag,
+        options: (tag.options || []).map(option => ({
+          ...option,
+          defaultSelected: false
+        }))
+      }
+    }
+
+    if (!defaultCandidate) return tag
+
+    return {
+      ...tag,
+      options: [{
+        dishId: defaultCandidate.dishId || '',
+        name: defaultCandidate.name || '',
+        defaultSelected: true
+      }]
+    }
+  }
+
+  const defaultDishId = defaultCandidate && defaultCandidate.dishId ? defaultCandidate.dishId : ''
+  const defaultName = defaultCandidate && defaultCandidate.name ? defaultCandidate.name : ''
+  const options = (tag.options || []).map(option => {
+    if (typeof option === 'string') {
+      const isDefault = !clearDefault && defaultName && option === defaultName
+      return {
+        name: option,
+        price: 0,
+        image: '',
+        defaultSelected: isDefault
+      }
+    }
+
+    const dishId = option.dishId || option._id || ''
+    const name = option.name || option.dishName || ''
+    let isDefault = false
+
+    if (!clearDefault) {
+      if (defaultDishId && dishId === defaultDishId) {
+        isDefault = true
+      } else if (defaultName && name === defaultName) {
+        isDefault = true
+      }
+    }
+
+    return {
+      ...option,
+      dishId,
+      name,
+      defaultSelected: isDefault
+    }
+  })
+
+  if (tag.type === 'single' && !clearDefault) {
+    let hasDefault = false
+    return {
+      ...tag,
+      options: options.map(option => {
+        if (option.defaultSelected && !hasDefault) {
+          hasDefault = true
+          return option
+        }
+        return {
+          ...option,
+          defaultSelected: false
+        }
+      })
+    }
+  }
 
   return {
     ...tag,
@@ -109,7 +227,11 @@ module.exports = {
   isCategoryRefTag,
   buildCategoryRefTag,
   dishToTagOption,
+  getOptionMatchKey,
+  buildDefaultKeySet,
+  isOptionDefault,
   expandCategoryRefTag,
+  applyBatchDefaultToTag,
   collectCategoryIdsFromTags,
   collectCategoryIdsFromDishes,
   getTagRemoveKey,

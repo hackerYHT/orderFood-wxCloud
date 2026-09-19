@@ -344,6 +344,7 @@
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  gap: 20rpx;
 }
 
 .order-price {
@@ -383,6 +384,16 @@
 .action-btn.cancel {
   background: rgba(229, 77, 66, 0.1);
   color: #e54d42;
+}
+
+.action-btn.pay-toggle.paid {
+  background: rgba(255, 151, 106, 0.1);
+  color: #ff976a;
+}
+
+.action-btn.pay-toggle.unpaid {
+  background: rgba(7, 193, 96, 0.1);
+  color: #07c160;
 }
 
 /* 空状态 */

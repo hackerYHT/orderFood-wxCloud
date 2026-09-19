@@ -471,6 +471,20 @@ Page({
         }
       })
 
+      let voiceOk = true
+      if (kitchenRes.result && kitchenRes.result.success && frontRes.result && frontRes.result.success) {
+        const voiceRes = await wx.cloud.callFunction({
+          name: 'printManage',
+          data: {
+            $url: 'payInVoice',
+            sn: printerInfo.sn,
+            text: (Number(testOrder.finalPrice) || 0).toFixed(2),
+            outTradeNo: `${testOrderId}_voice`
+          }
+        })
+        voiceOk = voiceRes.result && voiceRes.result.success
+      }
+
       wx.hideLoading()
 
       const kitchenOk = kitchenRes.result && kitchenRes.result.success
