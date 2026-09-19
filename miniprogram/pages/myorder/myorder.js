@@ -1,5 +1,4 @@
 // pages/myorder/myorder.js
-const app = getApp()
 const db = wx.cloud.database()
 
 Page({
@@ -33,14 +32,13 @@ Page({
     try {
       this.setData({ loadingOrders: true })
 
-      const openid = app.globalData.openid
       const pageSize = this.data.orderPageSize
       const page = append ? this.data.orderPage + 1 : 0
       const skip = page * pageSize
       const _ = db.command
 
+      // 店员共用：所有员工查看全部点餐订单，不按 _openid 隔离
       const where = {
-        _openid: openid,
         type: 'order'
       }
       if (this.data.payFilter === 1) {
