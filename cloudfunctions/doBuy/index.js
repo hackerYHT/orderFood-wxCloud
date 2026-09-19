@@ -6,7 +6,6 @@ cloud.init({
 
 const db = cloud.database()
 const PACKAGING_FEE = 1
-const SHOP_NAME = '红星面馆'
 
 const getStringWidth = (str) => {
   if (!str) return 0
@@ -102,6 +101,12 @@ async function getNextQueueNumber() {
 
 const TAG_PRICE_SUFFIX = /\s\+(\d+(?:\.\d+)?)元$/
 
+// 打印字体：菜品加高但不加宽，避免 58mm 纸一行装不下名称+数量+价格
+const FONT_DISH_HEIGHT = 2
+const FONT_DISH_WIDTH = 1
+const FONT_TAG_HEIGHT = 2
+const FONT_TAG_WIDTH = 1
+
 const getItemBasePrice = (item) => {
   if (item.basePrice != null && item.basePrice !== '') {
     return Number(item.basePrice) || 0
@@ -111,19 +116,19 @@ const getItemBasePrice = (item) => {
   return extraPrice > 0 ? Math.max(0, unitPrice - extraPrice) : unitPrice
 }
 
-const appendAlignedLine = (leftText, rightPart, fontHeight = 1) => {
+const appendAlignedLine = (leftText, rightPart, fontHeight = 1, fontWidth = fontHeight) => {
   const leftWidth = getStringWidth(leftText)
   const rightWidth = getStringWidth(rightPart)
-  const totalWidth = 31
+  // 58mm 纸约 32 半角；font width 放大后可用列宽需折算
+  const totalWidth = Math.floor(31 / fontWidth)
   const spacesNeeded = totalWidth - leftWidth - rightWidth
   const spaces = spacesNeeded > 0 ? generateSpaces(spacesNeeded) : ' '
-  return `<LEFT><font# bolder=0 height=${fontHeight} width=1>${leftText}${spaces}${rightPart}</font#></LEFT><BR>`
+  return `<LEFT><font# bolder=0 height=${fontHeight} width=${fontWidth}>${leftText}${spaces}${rightPart}</font#></LEFT><BR>`
 }
 
 // ticketType: 'front' 前台（含价格） | 'kitchen' 后厨（无价格）
 function generatePrintContent(order, ticketType = 'front') {
   const isKitchen = ticketType === 'kitchen'
-  const orderTypeText = order.orderType === 'dineIn' ? '堂食' : '打包'
   const date = getOrderDate(order)
 
   let content = ''
@@ -132,10 +137,6 @@ function generatePrintContent(order, ticketType = 'front') {
     content += `<C><font# bolder=1 height=3 width=2>#${escapeHtml(order.queueNumber)}</font#></C><BR>`
     content += `<C>--------------------------------</C><BR>`
   }
-  const ticketLabel = isKitchen ? '后厨' : '前台'
-  content += `<C><font# bolder=1 height=2 width=2>${SHOP_NAME}</font#></C><BR>`
-  content += `<C><font# bolder=1 height=2 width=2>${ticketLabel}·${orderTypeText}订单</font#></C><BR>`
-  content += `<C>--------------------------------</C><BR>`
 
   if (order.tableNumber) {
     content += `<C><font# bolder=1 height=2 width=2>桌码: ${escapeHtml(order.tableNumber)}</font#></C><BR>`
@@ -157,7 +158,7 @@ function generatePrintContent(order, ticketType = 'front') {
       const count = item.count || 1
       const basePrice = getItemBasePrice(item)
       const rightPart = `×${count}  ￥${basePrice.toFixed(2)}`
-      content += appendAlignedLine(dishName, rightPart, 3)
+      content += appendAlignedLine(dishName, rightPart, FONT_DISH_HEIGHT, FONT_DISH_WIDTH)
 
       if (item.tags && Array.isArray(item.tags) && item.tags.length > 0) {
         item.tags.forEach(tagStr => {
@@ -166,7 +167,7 @@ function generatePrintContent(order, ticketType = 'front') {
           const tagPrice = priceMatch ? parseFloat(priceMatch[1]) : 0
           const tagLabel = escapeHtml(priceMatch ? raw.slice(0, priceMatch.index).trim() : raw)
           const tagRight = tagPrice > 0 ? `  ￥${tagPrice.toFixed(2)}` : ''
-          content += appendAlignedLine(`  ${tagLabel}`, tagRight, 2)
+          content += appendAlignedLine(`  ${tagLabel}`, tagRight, FONT_TAG_HEIGHT, FONT_TAG_WIDTH)
         })
       }
     })
@@ -181,10 +182,6 @@ function generatePrintContent(order, ticketType = 'front') {
   content += `<RIGHT><font# bolder=1 height=2 width=2>合计  ￥${finalPrice}</font#></RIGHT><BR>`
   const payStatusText = order.pay_status ? '已付' : '未付'
   content += `<LEFT>支付状态: ${payStatusText}</LEFT><BR>`
-  if (!isKitchen) {
-    content += `<LEFT>订单来源: 店员口头点餐</LEFT><BR>`
-  }
-  content += `<LEFT>订单编号: ${escapeHtml(order._id)}</LEFT><BR>`
   content += `<LEFT>下单时间: ${formatDate(date)}</LEFT><BR>`
   content += `<C>**************<font# bolder=1 height=2 width=1>完</font#><font# bolder=0 height=1 width=1>**************</font#></C><BR>`
   return content
