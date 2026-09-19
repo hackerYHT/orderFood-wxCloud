@@ -386,6 +386,11 @@
   color: #e54d42;
 }
 
+.action-btn.edit {
+  background: rgba(56, 178, 172, 0.1);
+  color: #38b2ac;
+}
+
 .action-btn.pay-toggle.paid {
   background: rgba(255, 151, 106, 0.1);
   color: #ff976a;

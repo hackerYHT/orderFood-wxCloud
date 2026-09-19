@@ -8,6 +8,7 @@ const {
   expandCategoryRefTag,
   collectCategoryIdsFromDishes
 } = require('../../utils/dishTags.js')
+const { cartToOrderGoods, orderGoodsToCart } = require('../../utils/orderGoods.js')
 
 Page({
   data: {
@@ -35,7 +36,9 @@ Page({
     goodsPage: 0,
     goodsPageSize: 20,
     goodsHasMore: true,
-    goodsLoading: false
+    goodsLoading: false,
+    editOrderMode: false,
+    editOrderId: ''
   },
 
   onLoad(options) {
@@ -76,6 +79,28 @@ Page({
 
   onShow() {
     this.loadUserInfo()
+    this.checkEditOrderMode()
+  },
+
+  checkEditOrderMode() {
+    const ctx = wx.getStorageSync('editOrderContext')
+    if (ctx && ctx.orderId && Array.isArray(ctx.goods)) {
+      const cart = orderGoodsToCart(ctx.goods)
+      this.setData({
+        editOrderMode: true,
+        editOrderId: ctx.orderId,
+        tableNumber: ctx.tableNumber || this.data.tableNumber || ''
+      })
+      this.updateCart(cart)
+      return
+    }
+
+    if (this.data.editOrderMode) {
+      this.setData({
+        editOrderMode: false,
+        editOrderId: ''
+      })
+    }
   },
 
   // 加载店铺信息
@@ -935,8 +960,13 @@ Page({
     })
   },
 
-  // 去确认打印
+  // 去确认打印 / 完成添加菜品
   goToSettle() {
+    if (this.data.editOrderMode) {
+      this.finishEditOrderAdd()
+      return
+    }
+
     if (this.data.cartCount === 0) {
       wx.showToast({ title: '购物车为空', icon: 'none' })
       return
@@ -945,8 +975,37 @@ Page({
     this.navigateToSettle()
   },
 
+  finishEditOrderAdd() {
+    const ctx = wx.getStorageSync('editOrderContext') || {}
+    if (!ctx.orderId) {
+      wx.showToast({ title: '编辑上下文丢失', icon: 'none' })
+      return
+    }
+
+    const goods = cartToOrderGoods(this.data.cart)
+    wx.setStorageSync('editOrderContext', {
+      ...ctx,
+      goods
+    })
+
+    this.setData({
+      editOrderMode: false,
+      editOrderId: ''
+    })
+    this.clearCart()
+
+    wx.navigateTo({
+      url: `/pages/orderEdit/orderEdit?orderId=${ctx.orderId}`
+    })
+  },
+
   // 跳转到结算页面（内部方法，用于有桌码后的跳转）
   navigateToSettle() {
+    if (this.data.editOrderMode || wx.getStorageSync('editOrderContext')) {
+      this.finishEditOrderAdd()
+      return
+    }
+
     // 将购物车数据存储到本地，供结算页面使用
     try {
       wx.setStorageSync('settleCartData', {

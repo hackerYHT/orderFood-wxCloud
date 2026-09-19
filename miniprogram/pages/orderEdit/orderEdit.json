@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "编辑订单",
+  "usingComponents": {
+    "van-tag": "/vant/tag/index",
+    "van-empty": "/vant/empty/index"
+  }
+}

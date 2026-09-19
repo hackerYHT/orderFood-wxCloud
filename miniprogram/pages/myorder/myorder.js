@@ -109,6 +109,15 @@ Page({
     })
   },
 
+  goEditOrder(e) {
+    const { id } = e.currentTarget.dataset
+    if (!id) return
+    wx.removeStorageSync('editOrderContext')
+    wx.navigateTo({
+      url: `/pages/orderEdit/orderEdit?orderId=${id}`
+    })
+  },
+
   async togglePayStatus(e) {
     const { id, status } = e.currentTarget.dataset
     if (!id) {

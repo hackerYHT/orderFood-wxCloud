@@ -154,6 +154,13 @@ Page({
       return
     }
 
+    const editCtx = wx.getStorageSync('editOrderContext')
+    if (editCtx && editCtx.orderId) {
+      wx.showToast({ title: '编辑订单请点「完成添加」后保存', icon: 'none' })
+      wx.navigateBack()
+      return
+    }
+
     if (!this.data.orderGoods.length) {
       wx.showToast({ title: '请先选择菜品', icon: 'none' })
       return

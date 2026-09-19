@@ -65,6 +65,13 @@
         </view>
         <view class="order-actions">
           <view
+            class="action-btn edit"
+            data-id="{{item._id}}"
+            catchtap="goEditOrder"
+          >
+            编辑
+          </view>
+          <view
             class="action-btn pay-toggle {{item.pay_status ? 'paid' : 'unpaid'}}"
             data-id="{{item._id}}"
             data-status="{{item.pay_status}}"

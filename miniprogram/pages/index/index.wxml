@@ -17,6 +17,11 @@
     />
   </view>
 
+  <!-- 编辑订单模式提示 -->
+  <view class="edit-order-banner" wx:if="{{editOrderMode}}">
+    <text>正在为订单添加/修改菜品，选完后点「完成添加」</text>
+  </view>
+
   <!-- 主内容区 -->
   <view class="main-content">
     <!-- 左侧分类菜单 -->
@@ -77,12 +82,13 @@
             <text class="price-num">{{cartTotalPriceText}}</text>
           </view>
           <view class="cart-tip" wx:if="{{tableNumber}}">桌号：{{tableNumber}}</view>
+          <view class="cart-tip" wx:elif="{{editOrderMode}}">编辑订单 · 选菜后点完成添加</view>
           <view class="cart-tip" wx:else>店员口头点餐 · 选菜后确认打印</view>
         </view>
       </view>
       <view class="cart-right">
-        <view class="settle-btn {{cartCount > 0 ? 'active' : ''}}" bindtap="goToSettle">
-          确认打印
+        <view class="settle-btn {{cartCount > 0 || editOrderMode ? 'active' : ''}}" bindtap="goToSettle">
+          {{editOrderMode ? '完成添加' : '确认打印'}}
         </view>
       </view>
     </view>
@@ -133,7 +139,7 @@
         </view>
       </view>
       <view class="cart-footer-right">
-        <view class="cart-settle-btn" bindtap="goToSettle">确认打印</view>
+        <view class="cart-settle-btn" bindtap="goToSettle">{{editOrderMode ? '完成添加' : '确认打印'}}</view>
       </view>
     </view>
   </view>

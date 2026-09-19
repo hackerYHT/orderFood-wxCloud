@@ -4,6 +4,7 @@
     "pages/myorder/myorder",
     "pages/myhome/myhome",
     "pages/settle/settle",
+    "pages/orderEdit/orderEdit",
     "pages/admin/admin",
     "pages/admin/dish/dish",
     "pages/admin/tagBatch/tagBatch",

@@ -1,0 +1,119 @@
+<!--pages/orderEdit/orderEdit.wxml-->
+<wxs module="priceHelper" src="../../utils/priceHelper.wxs"></wxs>
+<view class="page">
+  <view class="notice-bar">
+    <text>修改后仅更新订单记录，不会重新打印小票</text>
+  </view>
+
+  <view class="section" wx:if="{{queueNumber}}">
+    <view class="queue-banner">取餐号 #{{queueNumber}}</view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">订单类型</view>
+    <view class="order-type-list">
+      <view
+        class="order-type-item {{orderType === 'dineIn' ? 'active' : ''}}"
+        data-value="dineIn"
+        bindtap="selectOrderType">
+        堂食
+      </view>
+      <view
+        class="order-type-item {{orderType === 'takeOut' ? 'active' : ''}}"
+        data-value="takeOut"
+        bindtap="selectOrderType">
+        打包
+      </view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">桌号（选填）</view>
+    <view class="table-number-wrapper">
+      <picker
+        mode="selector"
+        range="{{tablePickerOptions}}"
+        value="{{tablePickerIndex}}"
+        bindchange="onTableNumberChange">
+        <view class="table-number-picker">
+          <text class="table-number-text {{tableNumber ? '' : 'placeholder'}}">{{tableNumber || '请选择桌号'}}</text>
+          <text class="table-number-arrow">›</text>
+        </view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">备注（选填）</view>
+    <view class="remark-wrapper">
+      <textarea
+        class="remark-input"
+        placeholder="可填写顾客要求"
+        value="{{remark}}"
+        bindinput="onRemarkInput"
+        maxlength="100"
+        auto-height />
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title-wrapper">
+      <text class="section-title">菜品明细</text>
+      <view class="add-dish-btn" bindtap="goAddDishes">添加菜品</view>
+    </view>
+
+    <view class="goods-list">
+      <view class="goods-item" wx:for="{{orderGoods}}" wx:key="index">
+        <image class="goods-image" src="{{item.dishImage}}" mode="aspectFill"></image>
+        <view class="goods-info">
+          <view class="goods-name">{{item.dishName}}</view>
+          <view class="goods-tags" wx:if="{{item.tags && item.tags.length > 0}}">
+            <van-tag
+              type="danger"
+              wx:for="{{item.tags}}"
+              wx:key="index"
+              wx:for-item="tagVal">
+              {{tagVal}}
+            </van-tag>
+          </view>
+          <view class="goods-price-row">
+            <text class="goods-price">¥{{item.price}}</text>
+            <text class="goods-subtotal">小计 ¥{{item.subtotal}}</text>
+          </view>
+        </view>
+        <view class="goods-edit-actions">
+          <view class="qty-btn" bindtap="onGoodsDecrease" data-index="{{index}}">-</view>
+          <text class="qty-num">{{item.count}}</text>
+          <view class="qty-btn" bindtap="onGoodsIncrease" data-index="{{index}}">+</view>
+          <view class="delete-btn" bindtap="onGoodsRemove" data-index="{{index}}">删</view>
+        </view>
+      </view>
+
+      <van-empty wx:if="{{orderGoods.length === 0}}" description="暂无菜品，请添加" />
+    </view>
+
+    <view class="price-info" wx:if="{{orderGoods.length > 0}}">
+      <view class="price-item">
+        <text class="price-label">商品小计</text>
+        <text class="price-value">¥{{priceHelper.formatPrice(totalPrice)}}</text>
+      </view>
+      <view class="price-item" wx:if="{{packagingFee > 0}}">
+        <text class="price-label">打包费</text>
+        <text class="price-value">¥{{priceHelper.formatPrice(packagingFee)}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="footer">
+    <view class="footer-price">
+      <text class="footer-label">合计：</text>
+      <text class="footer-price-num">¥{{priceHelper.formatPrice(finalPrice)}}</text>
+    </view>
+    <view
+      class="save-btn {{saving || orderGoods.length === 0 ? 'disabled' : ''}}"
+      bindtap="saveOrder">
+      <text wx:if="{{saving}}">保存中...</text>
+      <text wx:else>保存修改</text>
+    </view>
+  </view>
+</view>

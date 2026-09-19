@@ -35,6 +35,15 @@
   background: white;
 }
 
+.edit-order-banner {
+  background: #fff8f0;
+  color: #ff976a;
+  font-size: 24rpx;
+  padding: 16rpx 30rpx;
+  text-align: center;
+  border-bottom: 1rpx solid #ffe8d6;
+}
+
 /* 顶部用户信息栏 */
 .user-bar {
   background: linear-gradient(135deg, #e54d42 0%, #f37370 100%);
