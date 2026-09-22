@@ -75,8 +75,33 @@
     </view>
   </view>
 
+  <view class="category-section">
+    <view class="section-header">
+      <view class="section-title">分类销量</view>
+      <view class="section-total" wx:if="{{topCategories.length > 0}}">总计 {{categoryTotalCount}} 份</view>
+    </view>
+    <view class="dish-list" wx:if="{{topCategories.length > 0}}">
+      <view class="dish-item" wx:for="{{topCategories}}" wx:key="name">
+        <view class="dish-rank rank-{{item.rank <= 3 ? item.rank : 'other'}}">{{item.rank}}</view>
+        <view class="dish-main">
+          <view class="dish-name">{{item.name}}</view>
+          <view class="dish-meta">销量 {{item.count}} 份 · ¥{{item.amountText}}</view>
+        </view>
+        <view class="dish-count">×{{item.count}}</view>
+      </view>
+      <view class="total-row">
+        <view class="total-label">总计</view>
+        <view class="total-detail">{{categoryTotalCount}} 份 · ¥{{categoryTotalAmountText}}</view>
+      </view>
+    </view>
+    <van-empty wx:else description="该时段暂无分类销量" />
+  </view>
+
   <view class="dish-section">
-    <view class="section-title">菜品销量排行</view>
+    <view class="section-header">
+      <view class="section-title">菜品销量排行</view>
+      <view class="section-total" wx:if="{{topDishes.length > 0}}">总计 {{dishTotalCount}} 份</view>
+    </view>
     <view class="dish-list" wx:if="{{topDishes.length > 0}}">
       <view class="dish-item" wx:for="{{topDishes}}" wx:key="name">
         <view class="dish-rank rank-{{item.rank <= 3 ? item.rank : 'other'}}">{{item.rank}}</view>
@@ -85,6 +110,10 @@
           <view class="dish-meta">销量 {{item.count}} 份 · ¥{{item.amountText}}</view>
         </view>
         <view class="dish-count">×{{item.count}}</view>
+      </view>
+      <view class="total-row">
+        <view class="total-label">总计</view>
+        <view class="total-detail">{{dishTotalCount}} 份 · ¥{{dishTotalAmountText}}</view>
       </view>
     </view>
     <van-empty wx:else description="该时段暂无订单" />

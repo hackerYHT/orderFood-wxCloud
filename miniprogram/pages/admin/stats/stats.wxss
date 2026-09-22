@@ -14,9 +14,27 @@
   margin-bottom: 20rpx;
 }
 
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.section-header .section-title {
+  margin-bottom: 0;
+}
+
+.section-total {
+  font-size: 26rpx;
+  font-weight: bold;
+  color: #e54d42;
+}
+
 .range-section,
 .summary-section,
 .type-section,
+.category-section,
 .dish-section {
   background: white;
   border-radius: 20rpx;
@@ -235,4 +253,25 @@
   font-weight: bold;
   color: #e54d42;
   flex-shrink: 0;
+}
+
+.total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8rpx;
+  padding: 24rpx 0 0;
+  border-top: 2rpx solid #f0f0f0;
+}
+
+.total-label {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.total-detail {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #e54d42;
 }

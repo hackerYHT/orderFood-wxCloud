@@ -79,6 +79,8 @@ Page({
         goodsList.push({
           dishId: item.dishId || item.info._id,
           dishName: item.info.name,
+          categoryId: item.info.categoryId || '',
+          categoryName: item.info.categoryName || '',
           dishImage: item.info.image,
           price: unitPrice,
           basePrice: Number(item.basePrice) || Number(item.info.price) || 0,
