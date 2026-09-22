@@ -213,7 +213,10 @@
                   </view>
                 </view>
                 <view class="tag-options" wx:if="{{item.source === 'categoryRef' || item.categoryId}}">
-                  <text class="option-item category-ref-tip">引用分类：{{item.categoryName || item.name}}（点餐时自动同步该分类下菜品）</text>
+                  <text class="option-item category-ref-tip">引用分类：{{item.categoryName || item.name}}（共 {{item.options.length || 0}} 项，点餐时自动同步）</text>
+                  <text class="option-item" wx:for="{{item.options}}" wx:key="index" wx:for-item="option">
+                    {{option.name || option}}{{option.price > 0 ? priceHelper.formatTagLabelSuffix(option.price) : ''}}{{option.defaultSelected ? ' 默认' : ''}}
+                  </text>
                 </view>
                 <view class="tag-options" wx:else>
                   <text class="option-item" wx:for="{{item.options}}" wx:key="index" wx:for-item="option">

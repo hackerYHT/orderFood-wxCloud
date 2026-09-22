@@ -289,10 +289,14 @@ Page({
 
   async loadCategoryDishesMap(categoryIds = []) {
     const uniqueIds = [...new Set((categoryIds || []).filter(Boolean))]
-    const nextMap = { ...(this.categoryDishesMap || {}) }
-    const missingIds = uniqueIds.filter(id => !nextMap[id])
+    if (!uniqueIds.length) {
+      return this.categoryDishesMap || {}
+    }
 
-    await Promise.all(missingIds.map(async categoryId => {
+    const nextMap = { ...(this.categoryDishesMap || {}) }
+
+    // Always refetch requested categories so categoryRef tags stay in sync
+    await Promise.all(uniqueIds.map(async categoryId => {
       const pageSize = 20
       let page = 0
       let dishes = []
@@ -1116,6 +1120,8 @@ Page({
   // 下拉刷新
   async onPullDownRefresh() {
     try {
+      this.categoryDishesMap = {}
+
       // 重置分页状态
       this.setData({
         goodsPage: 0,

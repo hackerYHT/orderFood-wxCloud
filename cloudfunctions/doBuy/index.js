@@ -128,7 +128,6 @@ const appendAlignedLine = (leftText, rightPart, fontHeight = 1, fontWidth = font
 
 // ticketType: 'front' 前台（含价格） | 'kitchen' 后厨（无价格）
 function generatePrintContent(order, ticketType = 'front') {
-  const isKitchen = ticketType === 'kitchen'
   const date = getOrderDate(order)
 
   let content = ''
@@ -143,11 +142,7 @@ function generatePrintContent(order, ticketType = 'front') {
   }
 
   if (order.remark) {
-    if (isKitchen) {
-      content += `<C><font# bolder=1 height=2 width=2>备注: ${escapeHtml(order.remark)}</font#></C><BR>`
-    } else {
-      content += `<LEFT>备注: ${escapeHtml(order.remark)}</LEFT><BR>`
-    }
+    content += `<C><font# bolder=1 height=2 width=2>备注: ${escapeHtml(order.remark)}</font#></C><BR>`
   }
 
   content += `<C>--------------商品--------------</C><BR>`

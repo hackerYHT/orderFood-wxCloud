@@ -1,7 +1,14 @@
 // pages/admin/dish/dish.js
 const db = wx.cloud.database()
 const { getCloudImageUrl, resolveCloudImageUrls } = require('../../../utils/cloudImage.js')
-const { isCategoryRefTag, removeTagByKey, getTagRemoveKey } = require('../../../utils/dishTags.js')
+const {
+  isCategoryRefTag,
+  removeTagByKey,
+  getTagRemoveKey,
+  expandCategoryRefTag,
+  collectCategoryIdsFromTags,
+  serializeTagsForStorage
+} = require('../../../utils/dishTags.js')
 const { formatRemoveError } = require('../../../utils/dbError.js')
 
 Page({
@@ -678,15 +685,60 @@ Page({
     })
   },
 
+  async loadCategoryDishesMap(categoryIds = []) {
+    const uniqueIds = [...new Set((categoryIds || []).filter(Boolean))]
+    const map = {}
+
+    await Promise.all(uniqueIds.map(async categoryId => {
+      const pageSize = 20
+      let page = 0
+      let dishes = []
+      let hasMore = true
+
+      while (hasMore) {
+        const res = await db.collection('dish')
+          .where({
+            categoryId,
+            status: 1
+          })
+          .orderBy('sort', 'asc')
+          .skip(page * pageSize)
+          .limit(pageSize)
+          .get()
+        const list = res.data || []
+        dishes = dishes.concat(list)
+        hasMore = list.length === pageSize
+        page += 1
+      }
+
+      map[categoryId] = dishes
+    }))
+
+    return map
+  },
+
+  async expandDishTagsForPreview(dish) {
+    const categoryIds = collectCategoryIdsFromTags(dish.tags || [])
+    const categoryDishesMap = categoryIds.length
+      ? await this.loadCategoryDishesMap(categoryIds)
+      : {}
+
+    return {
+      ...dish,
+      tags: (dish.tags || []).map(tag => expandCategoryRefTag(tag, categoryDishesMap))
+    }
+  },
+
   // 显示编辑菜品弹窗
   async showEditDishModal(e) {
     const dish = e.currentTarget.dataset.dish
     const imageUrl = await getCloudImageUrl(dish.image)
+    const previewDish = await this.expandDishTagsForPreview(dish)
     this.setData({
       showDishModal: true,
       editDishMode: true,
       currentDish: {
-        ...dish,
+        ...previewDish,
         imageUrl: imageUrl || dish.image || ''
       }
     })
@@ -977,10 +1029,11 @@ Page({
 
     try {
       wx.showLoading({ title: '保存中...' })
-      const { _id, _openid, ...updateData } = currentDish
+      const { _id, _openid, imageUrl, ...updateData } = currentDish
       // 确保价格和原价是数字类型
       updateData.price = price
       updateData.originalPrice = originalPrice
+      updateData.tags = serializeTagsForStorage(updateData.tags)
       
       if (editDishMode) {
         // 编辑（去掉 _id 和 _openid 等系统字段）

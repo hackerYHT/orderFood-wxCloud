@@ -222,6 +222,35 @@ function removeTagByKey(tags = [], removeKey) {
   return tags.filter(tag => !tagsMatchRemoveKey(tag, removeKey))
 }
 
+function serializeTagForStorage(tag) {
+  if (!tag) return tag
+
+  if (!isCategoryRefTag(tag)) {
+    return tag
+  }
+
+  const defaultOption = (tag.options || []).find(option => option && option.defaultSelected === true)
+  if (!defaultOption) {
+    return {
+      ...tag,
+      options: []
+    }
+  }
+
+  return {
+    ...tag,
+    options: [{
+      dishId: defaultOption.dishId || defaultOption._id || '',
+      name: defaultOption.name || defaultOption.dishName || '',
+      defaultSelected: true
+    }]
+  }
+}
+
+function serializeTagsForStorage(tags = []) {
+  return (tags || []).map(serializeTagForStorage)
+}
+
 module.exports = {
   CATEGORY_REF_SOURCE,
   isCategoryRefTag,
@@ -238,5 +267,7 @@ module.exports = {
   getTagDisplayLabel,
   tagsMatchRemoveKey,
   mergeTagIntoDish,
-  removeTagByKey
+  removeTagByKey,
+  serializeTagForStorage,
+  serializeTagsForStorage
 }
