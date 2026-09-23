@@ -98,7 +98,7 @@
         <text class="price-value">¥{{priceHelper.formatPrice(totalPrice)}}</text>
       </view>
       <view class="price-item" wx:if="{{packagingFee > 0}}">
-        <text class="price-label">打包费</text>
+        <text class="price-label">打包费（{{packagingFeeItemCount}}件）</text>
         <text class="price-value">¥{{priceHelper.formatPrice(packagingFee)}}</text>
       </view>
     </view>

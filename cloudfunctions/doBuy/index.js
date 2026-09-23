@@ -7,6 +7,30 @@ cloud.init({
 const db = cloud.database()
 const PACKAGING_FEE = 1
 
+async function loadPackagingFeeCategoryIds() {
+  const res = await db.collection('dishCategory').limit(100).get()
+  const ids = new Set()
+  ;(res.data || []).forEach(cat => {
+    if (cat && cat.packagingFee === true && cat._id) {
+      ids.add(cat._id)
+    }
+  })
+  return ids
+}
+
+function calcPackagingFeeFromGoods(goods, categoryIds) {
+  let itemCount = 0
+  ;(goods || []).forEach(item => {
+    if (item.categoryId && categoryIds.has(item.categoryId)) {
+      itemCount += Number(item.count) || 0
+    }
+  })
+  return {
+    packagingFee: itemCount * PACKAGING_FEE,
+    packagingFeeItemCount: itemCount
+  }
+}
+
 const getStringWidth = (str) => {
   if (!str) return 0
   let width = 0
@@ -171,7 +195,8 @@ function generatePrintContent(order, ticketType = 'front') {
   content += `<C>--------------------------------</C><BR>`
   const packagingFee = Number(order.packagingFee) || 0
   if (packagingFee > 0) {
-    content += `<RIGHT><font# bolder=0 height=1 width=1>打包费  ￥${packagingFee.toFixed(2)}</font#></RIGHT><BR>`
+    const countText = order.packagingFeeItemCount ? ` (${order.packagingFeeItemCount}件)` : ''
+    content += `<RIGHT><font# bolder=0 height=1 width=1>打包费  ￥${packagingFee.toFixed(2)}${countText}</font#></RIGHT><BR>`
   }
   const finalPrice = (order.finalPrice || 0).toFixed(2)
   content += `<RIGHT><font# bolder=1 height=2 width=2>合计  ￥${finalPrice}</font#></RIGHT><BR>`
@@ -287,6 +312,9 @@ exports.main = async (event, context) => {
   const {
     orderGoods,
     totalPrice,
+    finalPrice: clientFinalPrice,
+    packagingFee: clientPackagingFee,
+    packagingFeeItemCount: clientPackagingFeeItemCount,
     tableNumber,
     orderType,
     remark,
@@ -297,8 +325,32 @@ exports.main = async (event, context) => {
     const finalOrderType = orderType || (tableNumber ? 'dineIn' : 'takeOut')
     const date = new Date()
     const orderTotal = Number(totalPrice) || 0
-    const packagingFee = finalOrderType === 'takeOut' ? PACKAGING_FEE : 0
+    let packagingFee = 0
+    let packagingFeeItemCount = 0
+    if (finalOrderType === 'takeOut') {
+      const categoryIds = await loadPackagingFeeCategoryIds()
+      const calculated = calcPackagingFeeFromGoods(orderGoods, categoryIds)
+      packagingFee = calculated.packagingFee
+      packagingFeeItemCount = calculated.packagingFeeItemCount
+
+      const clientFee = clientPackagingFee != null && clientPackagingFee !== ''
+        ? Math.max(0, Number(clientPackagingFee) || 0)
+        : null
+      const clientCount = clientPackagingFeeItemCount != null && clientPackagingFeeItemCount !== ''
+        ? Math.max(0, parseInt(clientPackagingFeeItemCount, 10) || 0)
+        : null
+
+      if (clientFee != null && Math.abs(clientFee - packagingFee) > 0.001) {
+        return { success: false, error: '打包费计算有误，请刷新后重试' }
+      }
+      if (clientCount != null && clientCount !== packagingFeeItemCount) {
+        return { success: false, error: '打包费件数计算有误，请刷新后重试' }
+      }
+    }
     const orderFinal = orderTotal + packagingFee
+    if (clientFinalPrice != null && clientFinalPrice !== '' && Math.abs(Number(clientFinalPrice) - orderFinal) > 0.001) {
+      return { success: false, error: '订单金额计算有误，请刷新后重试' }
+    }
     const { queueDate, queueNumber } = await getNextQueueNumber()
 
     const orderData = {
@@ -306,6 +358,7 @@ exports.main = async (event, context) => {
       goods: orderGoods,
       totalPrice: orderTotal,
       packagingFee,
+      packagingFeeItemCount,
       finalPrice: orderFinal,
       orderType: finalOrderType,
       pay_status: pay_status === true,

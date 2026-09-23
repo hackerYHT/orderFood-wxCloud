@@ -1,8 +1,10 @@
 // pages/settle/settle.js
 const { formatTagLabelSuffix } = require('../../utils/price.js')
-const PACKAGING_FEE = 1
-const TABLE_OPTIONS = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6']
-const TABLE_PICKER_OPTIONS = ['不选', ...TABLE_OPTIONS]
+const {
+  TABLE_OPTIONS,
+  TABLE_PICKER_OPTIONS,
+  calcOrderPrices
+} = require('../../utils/orderGoods.js')
 
 Page({
   data: {
@@ -10,6 +12,8 @@ Page({
     totalPrice: 0,
     finalPrice: 0,
     packagingFee: 0,
+    packagingFeeItemCount: 0,
+    packagingFeeCategories: [],
     orderType: 'dineIn',
     tablePickerOptions: TABLE_PICKER_OPTIONS,
     tablePickerIndex: 0,
@@ -20,8 +24,28 @@ Page({
     canSubmit: false
   },
 
-  onLoad() {
+  async onLoad() {
+    await this.loadPackagingFeeCategories()
     this.loadCartData()
+  },
+
+  async loadPackagingFeeCategories() {
+    try {
+      const res = await wx.cloud.callFunction({ name: 'getCategory' })
+      const result = res.result || {}
+      const categories = result.success ? (result.data || []) : []
+      this.setData({ packagingFeeCategories: categories })
+      return categories
+    } catch (err) {
+      console.warn('加载分类打包费配置失败', err)
+      return this.data.packagingFeeCategories
+    }
+  },
+
+  recalcPrices(orderType, orderGoods) {
+    const type = orderType != null ? orderType : this.data.orderType
+    const goods = orderGoods != null ? orderGoods : this.data.orderGoods
+    return calcOrderPrices(goods, type, this.data.packagingFeeCategories)
   },
 
   loadCartData() {
@@ -92,9 +116,8 @@ Page({
         })
       }
 
-      const totalPrice = Number(cartData.totalPrice) || 0
       const orderType = cartData.orderType || 'dineIn'
-      const packagingFee = orderType === 'takeOut' ? PACKAGING_FEE : 0
+      const { totalPrice, packagingFee, packagingFeeItemCount, finalPrice } = this.recalcPrices(orderType, goodsList)
       const rawTableNumber = (cartData.tableNumber || '').trim()
       const tableNumber = TABLE_OPTIONS.includes(rawTableNumber) ? rawTableNumber : ''
       const tablePickerIndex = tableNumber ? TABLE_PICKER_OPTIONS.indexOf(tableNumber) : 0
@@ -102,7 +125,8 @@ Page({
         orderGoods: goodsList,
         totalPrice,
         packagingFee,
-        finalPrice: totalPrice + packagingFee,
+        packagingFeeItemCount,
+        finalPrice,
         tableNumber,
         tablePickerIndex: tablePickerIndex >= 0 ? tablePickerIndex : 0,
         orderType,
@@ -120,11 +144,10 @@ Page({
 
   selectOrderType(e) {
     const orderType = e.currentTarget.dataset.value
-    const packagingFee = orderType === 'takeOut' ? PACKAGING_FEE : 0
+    const prices = this.recalcPrices(orderType)
     this.setData({
       orderType,
-      packagingFee,
-      finalPrice: this.data.totalPrice + packagingFee
+      ...prices
     })
   },
 
@@ -179,6 +202,7 @@ Page({
           totalPrice: this.data.totalPrice,
           finalPrice: this.data.finalPrice,
           packagingFee: this.data.packagingFee,
+          packagingFeeItemCount: this.data.packagingFeeItemCount,
           tableNumber: this.data.tableNumber,
           orderType: this.data.orderType,
           remark: this.data.remark,

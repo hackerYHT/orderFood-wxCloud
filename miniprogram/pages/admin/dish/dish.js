@@ -21,7 +21,8 @@ Page({
     currentCategory: {
       _id: '',
       name: '',
-      sort: 0
+      sort: 0,
+      packagingFee: false
     },
     
     // 菜品相关
@@ -135,7 +136,8 @@ Page({
       currentCategory: {
         _id: '',
         name: '',
-        sort: this.data.categories.length
+        sort: this.data.categories.length,
+        packagingFee: false
       }
     })
   },
@@ -146,7 +148,10 @@ Page({
     this.setData({
       showCategoryModal: true,
       editCategoryMode: true,
-      currentCategory: { ...category }
+      currentCategory: {
+        ...category,
+        packagingFee: category.packagingFee === true
+      }
     })
   },
 
@@ -171,6 +176,11 @@ Page({
     })
   },
 
+  onCategoryPackagingFeeChange(e) {
+    this.setData({
+      'currentCategory.packagingFee': e.detail.value
+    })
+  },
 
   // 保存分类
   async saveCategory() {
@@ -189,16 +199,18 @@ Page({
 
       if (editCategoryMode) {
         // 编辑
-        const { _id, _openid,...updateData } = currentCategory
+        const { _id, _openid, ...updateData } = currentCategory
+        updateData.packagingFee = currentCategory.packagingFee === true
         await db.collection('dishCategory').doc(_id).update({
           data: updateData
         })
       } else {
         // 添加
-        const addRes =         await db.collection('dishCategory').add({
+        const addRes = await db.collection('dishCategory').add({
           data: {
             name: currentCategory.name,
             sort: currentCategory.sort,
+            packagingFee: currentCategory.packagingFee === true,
             createTime: new Date()
           }
         })

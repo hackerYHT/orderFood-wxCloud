@@ -1,8 +1,21 @@
 /* pages/settle/settle.wxss */
 .page {
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
   background: #f5f5f5;
-  padding-bottom: 120rpx; /* 为底部按钮留出空间 */
+  box-sizing: border-box;
+}
+
+.page-scroll {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+}
+
+.page-content {
+  /* 与 .footer 等高：24 + 88 + 24 + safe-area */
+  padding-bottom: calc(136rpx + env(safe-area-inset-bottom));
 }
 
 .section {
@@ -391,6 +404,7 @@
 
 /* 底部提交区域 */
 .footer {
+  flex-shrink: 0;
   position: fixed;
   bottom: 0;
   left: 0;

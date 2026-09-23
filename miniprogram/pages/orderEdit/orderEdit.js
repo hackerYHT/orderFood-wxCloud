@@ -14,6 +14,8 @@ Page({
     totalPrice: 0,
     finalPrice: 0,
     packagingFee: 0,
+    packagingFeeItemCount: 0,
+    packagingFeeCategories: [],
     orderType: 'dineIn',
     tablePickerOptions: TABLE_PICKER_OPTIONS,
     tablePickerIndex: 0,
@@ -32,7 +34,9 @@ Page({
       setTimeout(() => wx.navigateBack(), 1500)
       return
     }
-    this.loadOrder()
+    this.loadPackagingFeeCategories().then(() => {
+      this.loadOrder()
+    })
   },
 
   onShow() {
@@ -49,6 +53,19 @@ Page({
       return
     }
     wx.removeStorageSync('editOrderContext')
+  },
+
+  async loadPackagingFeeCategories() {
+    try {
+      const res = await wx.cloud.callFunction({ name: 'getCategory' })
+      const result = res.result || {}
+      const categories = result.success ? (result.data || []) : []
+      this.setData({ packagingFeeCategories: categories })
+      return categories
+    } catch (err) {
+      console.warn('加载分类打包费配置失败', err)
+      return this.data.packagingFeeCategories
+    }
   },
 
   async loadOrder() {
@@ -79,7 +96,11 @@ Page({
   applyOrderState(order) {
     const goods = normalizeGoodsList(order.goods)
     const orderType = order.orderType || (order.tableNumber ? 'dineIn' : 'takeOut')
-    const { totalPrice, packagingFee, finalPrice } = calcOrderPrices(goods, orderType)
+    const { totalPrice, packagingFee, packagingFeeItemCount, finalPrice } = calcOrderPrices(
+      goods,
+      orderType,
+      this.data.packagingFeeCategories
+    )
     const { tableNumber, tablePickerIndex } = resolveTablePickerIndex(order.tableNumber)
 
     this.setData({
@@ -87,6 +108,7 @@ Page({
       orderType,
       totalPrice,
       packagingFee,
+      packagingFeeItemCount,
       finalPrice,
       tableNumber,
       tablePickerIndex,
@@ -112,12 +134,17 @@ Page({
   recalcAndSet(goods, orderType) {
     const nextType = orderType != null ? orderType : this.data.orderType
     const list = normalizeGoodsList(goods)
-    const { totalPrice, packagingFee, finalPrice } = calcOrderPrices(list, nextType)
+    const { totalPrice, packagingFee, packagingFeeItemCount, finalPrice } = calcOrderPrices(
+      list,
+      nextType,
+      this.data.packagingFeeCategories
+    )
     this.setData({
       orderGoods: list,
       orderType: nextType,
       totalPrice,
       packagingFee,
+      packagingFeeItemCount,
       finalPrice
     })
     this.syncEditContext()
@@ -202,7 +229,11 @@ Page({
     }
 
     const orderType = this.data.orderType || (this.data.tableNumber ? 'dineIn' : 'takeOut')
-    const { totalPrice, packagingFee, finalPrice } = calcOrderPrices(goods, orderType)
+    const { totalPrice, packagingFee, packagingFeeItemCount, finalPrice } = calcOrderPrices(
+      goods,
+      orderType,
+      this.data.packagingFeeCategories
+    )
 
     this.setData({ saving: true })
     wx.showLoading({ title: '保存中...' })
@@ -213,6 +244,7 @@ Page({
           goods,
           totalPrice,
           packagingFee,
+          packagingFeeItemCount,
           finalPrice,
           orderType,
           tableNumber: this.data.tableNumber || '',

@@ -74,7 +74,7 @@ Page({
 
       if (shopInfo._id) {
         // 更新
-        const { _id, _openid,...updateData } = shopInfo
+        const { _id, _openid, ...updateData } = shopInfo
         await db.collection('shopInfo').doc(_id).update({
           data: updateData
         })
@@ -108,4 +108,3 @@ Page({
     }
   }
 })
-

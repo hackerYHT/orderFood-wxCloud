@@ -28,12 +28,46 @@ function normalizeGoodsList(goods) {
   })
 }
 
-function calcOrderPrices(goods, orderType) {
+function getPackagingFeeCategoryIds(categories) {
+  const ids = new Set()
+  ;(categories || []).forEach(cat => {
+    if (cat && cat.packagingFee === true && cat._id) {
+      ids.add(cat._id)
+    }
+  })
+  return ids
+}
+
+function countPackagingFeeItems(goods, packagingFeeCategories) {
+  const categoryIds = packagingFeeCategories instanceof Set
+    ? packagingFeeCategories
+    : getPackagingFeeCategoryIds(packagingFeeCategories)
+  let itemCount = 0
+  normalizeGoodsList(goods).forEach(item => {
+    if (item.categoryId && categoryIds.has(item.categoryId)) {
+      itemCount += Number(item.count) || 0
+    }
+  })
+  return itemCount
+}
+
+function calcPackagingFee(goods, orderType, packagingFeeCategories) {
+  if (orderType !== 'takeOut') {
+    return { packagingFee: 0, packagingFeeItemCount: 0 }
+  }
+  const packagingFeeItemCount = countPackagingFeeItems(goods, packagingFeeCategories)
+  return {
+    packagingFee: packagingFeeItemCount * PACKAGING_FEE,
+    packagingFeeItemCount
+  }
+}
+
+function calcOrderPrices(goods, orderType, packagingFeeCategories) {
   const list = normalizeGoodsList(goods)
   const totalPrice = list.reduce((sum, item) => sum + item.price * item.count, 0)
-  const packagingFee = orderType === 'takeOut' ? PACKAGING_FEE : 0
+  const { packagingFee, packagingFeeItemCount } = calcPackagingFee(list, orderType, packagingFeeCategories)
   const finalPrice = totalPrice + packagingFee
-  return { totalPrice, packagingFee, finalPrice }
+  return { totalPrice, packagingFee, packagingFeeItemCount, finalPrice }
 }
 
 function buildTagsArrayFromCartItem(item) {
@@ -138,6 +172,9 @@ module.exports = {
   TABLE_PICKER_OPTIONS,
   calcItemSubtotal,
   normalizeGoodsList,
+  getPackagingFeeCategoryIds,
+  countPackagingFeeItems,
+  calcPackagingFee,
   calcOrderPrices,
   cartToOrderGoods,
   orderGoodsToCart,

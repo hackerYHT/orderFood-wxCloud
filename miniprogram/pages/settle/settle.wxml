@@ -1,6 +1,8 @@
 <!--pages/settle/settle.wxml-->
 <wxs module="priceHelper" src="../../utils/priceHelper.wxs"></wxs>
 <view class="page">
+  <scroll-view class="page-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+  <view class="page-content">
   <view class="section">
     <view class="section-title">订单类型</view>
     <view class="order-type-list">
@@ -103,12 +105,14 @@
         <text class="price-label">商品小计</text>
         <text class="price-value">¥{{priceHelper.formatPrice(totalPrice)}}</text>
       </view>
-      <view class="price-item" wx:if="{{packagingFee > 0}}">
-        <text class="price-label">打包费</text>
+      <view class="price-item" wx:if="{{orderType === 'takeOut' && packagingFeeItemCount > 0}}">
+        <text class="price-label">打包费（{{packagingFeeItemCount}}件）</text>
         <text class="price-value">¥{{priceHelper.formatPrice(packagingFee)}}</text>
       </view>
     </view>
   </view>
+  </view>
+  </scroll-view>
 
   <view class="footer">
     <view class="footer-price">
