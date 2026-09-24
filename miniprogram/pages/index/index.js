@@ -169,17 +169,22 @@ Page({
   },
 
 
-  // 加载菜品分类
+  // 加载菜品分类（直连数据库，避免云函数冷启动/超时）
   async loadMenu(showLoading = true) {
     if (showLoading) {
       wx.showLoading({ title: '加载中...' })
     }
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'getCategory'
-      })
-      const result = res.result || {}
-      const list = result.success ? (result.data || []) : []
+      const fetchCategories = () => db.collection('dishCategory').orderBy('sort', 'asc').get()
+      let list = []
+      try {
+        const res = await fetchCategories()
+        list = res.data || []
+      } catch (firstErr) {
+        console.warn('加载菜品分类失败，重试中', firstErr)
+        const res = await fetchCategories()
+        list = res.data || []
+      }
       
       if (list.length > 0) {
         const firstId = list[0]._id
@@ -187,18 +192,26 @@ Page({
           menuList: list,
           currentMenuId: firstId,
           goodsPage: 0,
-          goodsHasMore: true
+          goodsHasMore: true,
+          goodsList: []
         })
-        this.loadGoods(firstId, false, false) // 不追加，不显示loading
+        await this.loadGoods(firstId, false, false) // 不追加，不显示loading
       } else {
+        this.setData({
+          menuList: [],
+          currentMenuId: '',
+          goodsList: [],
+          goodsPage: 0,
+          goodsHasMore: false
+        })
         if (showLoading) {
-          wx.showToast({ title: '暂无菜品分类', icon: 'none' })
+          wx.showToast({ title: '暂无菜品分类，请先在管理后台添加分类', icon: 'none' })
         }
       }
     } catch (err) {
       console.error('加载菜品分类失败', err)
       if (showLoading) {
-        wx.showToast({ title: '加载失败', icon: 'none' })
+        wx.showToast({ title: '加载失败，请检查网络后重试', icon: 'none' })
       }
     } finally {
       if (showLoading) {
@@ -223,18 +236,18 @@ Page({
       const page = append ? this.data.goodsPage + 1 : 0
       const skip = page * pageSize
 
+      // 与管理端一致：仅按 categoryId 查询，避免 status 参与复合索引导致查询失败
       const goodsRes = await db.collection('dish')
         .where({
-          categoryId: menuId,
-          status: 1 // 1表示上架
+          categoryId: menuId
         })
         .orderBy('sort', 'asc')
         .skip(skip)
         .limit(pageSize)
         .get()
       
-      // 为每个菜品添加购物车数量
-      const list = goodsRes.data || []
+      // 为每个菜品添加购物车数量（客户端过滤上架菜品）
+      const list = (goodsRes.data || []).filter(item => item.status === 1 && item.deleted !== true)
       const categoryDishesMap = await this.loadCategoryDishesMap(
         collectCategoryIdsFromDishes(list)
       )
@@ -305,14 +318,13 @@ Page({
       while (hasMore) {
         const res = await db.collection('dish')
           .where({
-            categoryId,
-            status: 1
+            categoryId
           })
           .orderBy('sort', 'asc')
           .skip(page * pageSize)
           .limit(pageSize)
           .get()
-        const list = res.data || []
+        const list = (res.data || []).filter(item => item.status === 1 && item.deleted !== true)
         dishes = dishes.concat(list)
         hasMore = list.length === pageSize
         page += 1

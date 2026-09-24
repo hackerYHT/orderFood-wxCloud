@@ -87,29 +87,31 @@ Page({
 
   // ==================== 分类管理 ====================
   
-  // 加载分类列表
+  // 加载分类列表（直连数据库，避免云函数冷启动/超时）
   async loadCategories() {
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'getCategory'
-      })
-      const result = res.result || {}
-      const categories = result.success ? (result.data || []) : []
-      
-      // 如果有分类且没有选中分类，默认选中第一个
-      if (categories.length > 0 && !this.data.currentCategoryId) {
+      const res = await db.collection('dishCategory').orderBy('sort', 'asc').get()
+      const categories = res.data || []
+      const currentCategoryId = this.data.currentCategoryId
+      const hasValidCategory = categories.some(item => item._id === currentCategoryId)
+
+      // 无选中分类，或当前分类已被删除时，默认选中第一个
+      if (categories.length > 0 && (!currentCategoryId || !hasValidCategory)) {
         this.setData({
-          categories: categories,
+          categories,
           currentCategoryId: categories[0]._id
         }, () => {
           this.loadDishes()
         })
       } else {
         this.setData({
-          categories: categories
+          categories,
+          currentCategoryId: categories.length === 0 ? '' : currentCategoryId
         }, () => {
           if (this.data.currentCategoryId) {
             this.loadDishes()
+          } else {
+            this.setData({ dishes: [] })
           }
         })
       }

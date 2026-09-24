@@ -261,15 +261,17 @@ async function printOrder(orderId, orderData) {
     const kitchenContent = generatePrintContent(orderData, 'kitchen')
     const frontContent = generatePrintContent(orderData, 'front')
 
-    const kitchenRes = await callPrintNote(printer, {
-      content: kitchenContent,
-      outTradeNo: `${orderId}_kitchen`,
-      voice: buildOrderTypeVoice(orderData.orderType)
-    })
-    const frontRes = await callPrintNote(printer, {
-      content: frontContent,
-      outTradeNo: `${orderId}_front`
-    })
+    const [kitchenRes, frontRes] = await Promise.all([
+      callPrintNote(printer, {
+        content: kitchenContent,
+        outTradeNo: `${orderId}_kitchen`,
+        voice: buildOrderTypeVoice(orderData.orderType)
+      }),
+      callPrintNote(printer, {
+        content: frontContent,
+        outTradeNo: `${orderId}_front`
+      })
+    ])
 
     const kitchenOk = kitchenRes.result && kitchenRes.result.success
     const frontOk = frontRes.result && frontRes.result.success
@@ -382,15 +384,16 @@ exports.main = async (event, context) => {
       createTime: date
     }
 
-    const printResult = await printOrder(orderId, orderWithId)
+    // 打印走后台，不阻塞下单响应（避免 printManage 串行调用导致超时）
+    printOrder(orderId, orderWithId).catch(err => {
+      console.error('后台打印订单失败', err)
+    })
 
     return {
       success: true,
       orderId,
       queueNumber,
-      printed: printResult.printed === true,
-      printReason: printResult.reason || '',
-      printError: printResult.printError || ''
+      printPending: true
     }
   } catch (err) {
     console.error('下单失败', err)

@@ -103,11 +103,8 @@ Page({
   },
 
   async fetchCategories() {
-    const res = await wx.cloud.callFunction({
-      name: 'getCategory'
-    })
-    const result = res.result || {}
-    return result.success ? (result.data || []) : []
+    const res = await db.collection('dishCategory').orderBy('sort', 'asc').get()
+    return res.data || []
   },
 
   async fetchAllDishes() {

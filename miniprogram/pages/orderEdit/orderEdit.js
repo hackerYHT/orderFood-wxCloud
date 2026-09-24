@@ -57,9 +57,8 @@ Page({
 
   async loadPackagingFeeCategories() {
     try {
-      const res = await wx.cloud.callFunction({ name: 'getCategory' })
-      const result = res.result || {}
-      const categories = result.success ? (result.data || []) : []
+      const res = await db.collection('dishCategory').orderBy('sort', 'asc').get()
+      const categories = res.data || []
       this.setData({ packagingFeeCategories: categories })
       return categories
     } catch (err) {

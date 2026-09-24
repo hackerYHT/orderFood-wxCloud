@@ -1,4 +1,5 @@
 // pages/settle/settle.js
+const db = wx.cloud.database()
 const { formatTagLabelSuffix } = require('../../utils/price.js')
 const {
   TABLE_OPTIONS,
@@ -31,9 +32,8 @@ Page({
 
   async loadPackagingFeeCategories() {
     try {
-      const res = await wx.cloud.callFunction({ name: 'getCategory' })
-      const result = res.result || {}
-      const categories = result.success ? (result.data || []) : []
+      const res = await db.collection('dishCategory').orderBy('sort', 'asc').get()
+      const categories = res.data || []
       this.setData({ packagingFeeCategories: categories })
       return categories
     } catch (err) {
@@ -216,9 +216,11 @@ Page({
 
       wx.hideLoading()
 
-      const { printed, printReason, printError, queueNumber } = doBuyRes.result
+      const { printed, printReason, printError, queueNumber, printPending } = doBuyRes.result
       let toastTitle = queueNumber ? `取餐号 #${queueNumber}` : '已提交并打印'
-      if (!printed) {
+      if (printPending) {
+        toastTitle = queueNumber ? `取餐号 #${queueNumber}` : '已提交'
+      } else if (!printed) {
         const reasonTitles = {
           no_printer: queueNumber ? `取餐号 #${queueNumber}（未绑定打印机）` : '已提交（未绑定打印机）',
           print_failed: queueNumber ? `取餐号 #${queueNumber}（打印失败）` : '已提交（打印失败）',
@@ -231,7 +233,7 @@ Page({
       }
       wx.showToast({
         title: toastTitle,
-        icon: printed ? 'success' : 'none',
+        icon: (printed || printPending) ? 'success' : 'none',
         duration: 2500
       })
 
