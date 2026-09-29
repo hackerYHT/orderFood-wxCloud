@@ -35,6 +35,10 @@
   background: linear-gradient(to right, #fff5f5, white);
 }
 
+.category-item.hidden {
+  opacity: 0.55;
+}
+
 .category-name {
   font-size: 26rpx;
   color: #333;
@@ -45,6 +49,19 @@
 .category-item.active .category-name {
   color: #e54d42;
   font-weight: bold;
+}
+
+.category-hidden-tag {
+  margin-top: 6rpx;
+  font-size: 18rpx;
+  color: #999;
+  background: #f0f0f0;
+  padding: 2rpx 8rpx;
+  border-radius: 6rpx;
+}
+
+.action-icon.visibility {
+  color: #38b2ac;
 }
 
 .category-indicator {
@@ -60,7 +77,9 @@
 
 .category-actions {
   display: flex;
-  gap: 15rpx;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10rpx;
   margin-top: 10rpx;
 }
 

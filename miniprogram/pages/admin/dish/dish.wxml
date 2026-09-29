@@ -6,15 +6,16 @@
     <!-- 左侧分类菜单 -->
     <scroll-view class="category-sidebar" scroll-y>
       <view 
-        class="category-item {{currentCategoryId === item._id ? 'active' : ''}}" 
+        class="category-item {{currentCategoryId === item._id ? 'active' : ''}} {{item.hidden ? 'hidden' : ''}}" 
         wx:for="{{categories}}" 
         wx:key="_id"
         bindtap="switchCategory"
         data-id="{{item._id}}">
         <text class="category-name">{{item.name}}</text>
+        <text class="category-hidden-tag" wx:if="{{item.hidden}}">已隐藏</text>
         <view class="category-indicator" wx:if="{{currentCategoryId === item._id}}"></view>
-        <!-- 长按编辑/删除 -->
         <view class="category-actions">
+          <text class="action-icon visibility" catchtap="toggleCategoryHidden" data-id="{{item._id}}" data-hidden="{{item.hidden}}">{{item.hidden ? '显示' : '隐藏'}}</text>
           <text class="action-icon edit" catchtap="showEditCategoryModal" data-category="{{item}}">编辑</text>
           <text class="action-icon delete" catchtap="deleteCategory" data-id="{{item._id}}" data-name="{{item.name}}">删除</text>
         </view>
@@ -115,6 +116,13 @@
             <text class="label-tip">（该分类菜品可在下单时勾选「打包」加收）</text>
           </view>
           <switch checked="{{currentCategory.packagingFee}}" bindchange="onCategoryPackagingFeeChange" color="#e54d42"/>
+        </view>
+        <view class="form-item">
+          <view class="form-label">
+            隐藏分类
+            <text class="label-tip">（隐藏后点餐页不显示该分类）</text>
+          </view>
+          <switch checked="{{currentCategory.hidden}}" bindchange="onCategoryHiddenChange" color="#e54d42"/>
         </view>
       </view>
       <view class="modal-footer">

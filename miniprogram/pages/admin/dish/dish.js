@@ -22,7 +22,8 @@ Page({
       _id: '',
       name: '',
       sort: 0,
-      packagingFee: false
+      packagingFee: false,
+      hidden: false
     },
     
     // 菜品相关
@@ -139,7 +140,8 @@ Page({
         _id: '',
         name: '',
         sort: this.data.categories.length,
-        packagingFee: false
+        packagingFee: false,
+        hidden: false
       }
     })
   },
@@ -152,7 +154,8 @@ Page({
       editCategoryMode: true,
       currentCategory: {
         ...category,
-        packagingFee: category.packagingFee === true
+        packagingFee: category.packagingFee === true,
+        hidden: category.hidden === true
       }
     })
   },
@@ -184,6 +187,37 @@ Page({
     })
   },
 
+  onCategoryHiddenChange(e) {
+    this.setData({
+      'currentCategory.hidden': e.detail.value
+    })
+  },
+
+  // 快捷切换分类隐藏/显示
+  async toggleCategoryHidden(e) {
+    const categoryId = e.currentTarget.dataset.id
+    const hidden = e.currentTarget.dataset.hidden === true || e.currentTarget.dataset.hidden === 'true'
+    if (!categoryId) return
+
+    const nextHidden = !hidden
+    try {
+      wx.showLoading({ title: '更新中...' })
+      await db.collection('dishCategory').doc(categoryId).update({
+        data: { hidden: nextHidden }
+      })
+      wx.hideLoading()
+      wx.showToast({
+        title: nextHidden ? '已隐藏' : '已显示',
+        icon: 'none'
+      })
+      this.loadCategories()
+    } catch (err) {
+      wx.hideLoading()
+      console.error('切换分类显示失败', err)
+      wx.showToast({ title: '操作失败', icon: 'none' })
+    }
+  },
+
   // 保存分类
   async saveCategory() {
     const { editCategoryMode, currentCategory } = this.data
@@ -203,6 +237,7 @@ Page({
         // 编辑
         const { _id, _openid, ...updateData } = currentCategory
         updateData.packagingFee = currentCategory.packagingFee === true
+        updateData.hidden = currentCategory.hidden === true
         await db.collection('dishCategory').doc(_id).update({
           data: updateData
         })
@@ -213,6 +248,7 @@ Page({
             name: currentCategory.name,
             sort: currentCategory.sort,
             packagingFee: currentCategory.packagingFee === true,
+            hidden: currentCategory.hidden === true,
             createTime: new Date()
           }
         })

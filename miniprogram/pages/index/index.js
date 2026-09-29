@@ -179,11 +179,11 @@ Page({
       let list = []
       try {
         const res = await fetchCategories()
-        list = res.data || []
+        list = (res.data || []).filter(item => item.hidden !== true)
       } catch (firstErr) {
         console.warn('加载菜品分类失败，重试中', firstErr)
         const res = await fetchCategories()
-        list = res.data || []
+        list = (res.data || []).filter(item => item.hidden !== true)
       }
       
       if (list.length > 0) {

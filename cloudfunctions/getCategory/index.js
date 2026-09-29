@@ -52,13 +52,13 @@ function buildCategoriesFromDishes(dishes = []) {
   return [...categoryMap.values()].sort((a, b) => a.sort - b.sort)
 }
 
-function mergeOrphanCategories(categories = [], dishes = []) {
+function mergeOrphanCategories(categories = [], dishes = [], excludedCategoryIds = new Set()) {
   const existingIds = new Set(categories.map(item => item._id))
   const orphanCategories = []
 
   dishes.forEach(dish => {
     const categoryId = dish.categoryId
-    if (!categoryId || existingIds.has(categoryId)) {
+    if (!categoryId || existingIds.has(categoryId) || excludedCategoryIds.has(categoryId)) {
       return
     }
 
@@ -90,13 +90,19 @@ exports.main = async (event, context) => {
       .limit(100)
       .get()
 
-    let categories = menuRes.data || []
+    const allCategories = menuRes.data || []
+    const hiddenCategoryIds = new Set(
+      allCategories.filter(cat => cat && cat.hidden === true).map(cat => cat._id)
+    )
+    let categories = allCategories.filter(cat => cat.hidden !== true)
     const onShelfDishes = await fetchOnShelfDishes()
 
     if (categories.length === 0 && onShelfDishes.length > 0) {
-      categories = buildCategoriesFromDishes(onShelfDishes)
+      // 无可见分类时，仅用未归属隐藏分类的菜品合成临时分类
+      const visibleDishes = onShelfDishes.filter(dish => !hiddenCategoryIds.has(dish.categoryId))
+      categories = buildCategoriesFromDishes(visibleDishes)
     } else if (categories.length > 0 && onShelfDishes.length > 0) {
-      categories = mergeOrphanCategories(categories, onShelfDishes)
+      categories = mergeOrphanCategories(categories, onShelfDishes, hiddenCategoryIds)
     }
 
     return {
