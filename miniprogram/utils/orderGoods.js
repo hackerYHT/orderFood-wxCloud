@@ -10,24 +10,6 @@ function calcItemSubtotal(item) {
   return (price * count).toFixed(2)
 }
 
-function normalizeGoodsList(goods) {
-  return (goods || []).map(item => {
-    const price = Number(item.price) || 0
-    const count = Number(item.count) || 1
-    return {
-      ...item,
-      dishId: item.dishId || item.goodsId || '',
-      dishName: item.dishName || item.goodsName || '未知菜品',
-      count,
-      price,
-      basePrice: item.basePrice != null ? Number(item.basePrice) : price,
-      extraPrice: Number(item.extraPrice) || 0,
-      tags: item.tags || [],
-      subtotal: calcItemSubtotal({ price, count })
-    }
-  })
-}
-
 function getPackagingFeeCategoryIds(categories) {
   const ids = new Set()
   ;(categories || []).forEach(cat => {
@@ -38,13 +20,48 @@ function getPackagingFeeCategoryIds(categories) {
   return ids
 }
 
-function countPackagingFeeItems(goods, packagingFeeCategories) {
+function isPackagingFeeCategory(categoryId, packagingFeeCategories) {
+  if (!categoryId) return false
   const categoryIds = packagingFeeCategories instanceof Set
     ? packagingFeeCategories
     : getPackagingFeeCategoryIds(packagingFeeCategories)
+  return categoryIds.has(categoryId)
+}
+
+function normalizeGoodsList(goods, packagingFeeCategories) {
+  const categoryIds = packagingFeeCategories != null
+    ? (packagingFeeCategories instanceof Set
+      ? packagingFeeCategories
+      : getPackagingFeeCategoryIds(packagingFeeCategories))
+    : null
+
+  return (goods || []).map(item => {
+    const price = Number(item.price) || 0
+    const count = Number(item.count) || 1
+    const packagingFeeEligible = categoryIds
+      ? !!(item.categoryId && categoryIds.has(item.categoryId))
+      : item.packagingFeeEligible === true
+    const needPackaging = packagingFeeEligible && item.needPackaging === true
+    return {
+      ...item,
+      dishId: item.dishId || item.goodsId || '',
+      dishName: item.dishName || item.goodsName || '未知菜品',
+      count,
+      price,
+      basePrice: item.basePrice != null ? Number(item.basePrice) : price,
+      extraPrice: Number(item.extraPrice) || 0,
+      tags: item.tags || [],
+      packagingFeeEligible,
+      needPackaging,
+      subtotal: calcItemSubtotal({ price, count })
+    }
+  })
+}
+
+function countPackagingFeeItems(goods, packagingFeeCategories) {
   let itemCount = 0
-  normalizeGoodsList(goods).forEach(item => {
-    if (item.categoryId && categoryIds.has(item.categoryId)) {
+  normalizeGoodsList(goods, packagingFeeCategories).forEach(item => {
+    if (item.needPackaging) {
       itemCount += Number(item.count) || 0
     }
   })
@@ -52,9 +69,7 @@ function countPackagingFeeItems(goods, packagingFeeCategories) {
 }
 
 function calcPackagingFee(goods, orderType, packagingFeeCategories) {
-  if (orderType !== 'takeOut') {
-    return { packagingFee: 0, packagingFeeItemCount: 0 }
-  }
+  // orderType 仅作兼容保留；打包费按菜品 needPackaging 勾选计费
   const packagingFeeItemCount = countPackagingFeeItems(goods, packagingFeeCategories)
   return {
     packagingFee: packagingFeeItemCount * PACKAGING_FEE,
@@ -63,11 +78,38 @@ function calcPackagingFee(goods, orderType, packagingFeeCategories) {
 }
 
 function calcOrderPrices(goods, orderType, packagingFeeCategories) {
-  const list = normalizeGoodsList(goods)
+  const list = normalizeGoodsList(goods, packagingFeeCategories)
   const totalPrice = list.reduce((sum, item) => sum + item.price * item.count, 0)
   const { packagingFee, packagingFeeItemCount } = calcPackagingFee(list, orderType, packagingFeeCategories)
   const finalPrice = totalPrice + packagingFee
-  return { totalPrice, packagingFee, packagingFeeItemCount, finalPrice }
+  return { totalPrice, packagingFee, packagingFeeItemCount, finalPrice, goods: list }
+}
+
+/**
+ * 按整单类型快捷勾选：打包=勾选全部可收打包费菜品；堂食=全部取消
+ */
+function applyOrderTypePackagingDefaults(goods, orderType, packagingFeeCategories) {
+  const list = normalizeGoodsList(goods, packagingFeeCategories)
+  const takeOut = orderType === 'takeOut'
+  return list.map(item => ({
+    ...item,
+    needPackaging: takeOut && item.packagingFeeEligible === true
+  }))
+}
+
+/**
+ * 历史订单兼容：无 needPackaging 字段时，整单打包则默认勾选可收打包费菜品
+ */
+function migrateNeedPackagingFromOrderType(goods, orderType, packagingFeeCategories) {
+  const list = normalizeGoodsList(goods, packagingFeeCategories)
+  const hasExplicit = (goods || []).some(item => item && typeof item.needPackaging === 'boolean')
+  if (hasExplicit) {
+    return list
+  }
+  if (orderType === 'takeOut') {
+    return applyOrderTypePackagingDefaults(list, 'takeOut', packagingFeeCategories)
+  }
+  return list
 }
 
 function buildTagsArrayFromCartItem(item) {
@@ -107,7 +149,7 @@ function buildTagsArrayFromCartItem(item) {
   return tagsArray
 }
 
-function cartToOrderGoods(cart) {
+function cartToOrderGoods(cart, packagingFeeCategories) {
   const goodsList = []
   for (let cartKey in cart) {
     const item = cart[cartKey]
@@ -126,10 +168,11 @@ function cartToOrderGoods(cart) {
       count: item.count,
       tags: buildTagsArrayFromCartItem(item),
       selectedOptions: item.selectedOptions || [],
+      needPackaging: item.needPackaging === true,
       subtotal: (unitPrice * item.count).toFixed(2)
     })
   }
-  return goodsList
+  return normalizeGoodsList(goodsList, packagingFeeCategories)
 }
 
 function orderGoodsToCart(goods) {
@@ -141,7 +184,9 @@ function orderGoodsToCart(goods) {
         _id: item.dishId,
         name: item.dishName,
         image: item.dishImage,
-        price: item.basePrice != null ? item.basePrice : item.price
+        price: item.basePrice != null ? item.basePrice : item.price,
+        categoryId: item.categoryId || '',
+        categoryName: item.categoryName || ''
       },
       count: item.count,
       tags: {},
@@ -150,7 +195,8 @@ function orderGoodsToCart(goods) {
       unitPrice: item.price,
       basePrice: item.basePrice != null ? item.basePrice : item.price,
       extraPrice: item.extraPrice || 0,
-      dishId: item.dishId
+      dishId: item.dishId,
+      needPackaging: item.needPackaging === true
     }
   })
   return cart
@@ -173,9 +219,12 @@ module.exports = {
   calcItemSubtotal,
   normalizeGoodsList,
   getPackagingFeeCategoryIds,
+  isPackagingFeeCategory,
   countPackagingFeeItems,
   calcPackagingFee,
   calcOrderPrices,
+  applyOrderTypePackagingDefaults,
+  migrateNeedPackagingFromOrderType,
   cartToOrderGoods,
   orderGoodsToCart,
   resolveTablePickerIndex

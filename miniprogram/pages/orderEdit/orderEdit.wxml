@@ -25,6 +25,7 @@
         打包
       </view>
     </view>
+    <view class="section-tip">整单快捷勾选；混单可在下方菜品单独勾选「打包」</view>
   </view>
 
   <view class="section">
@@ -79,6 +80,14 @@
           <view class="goods-price-row">
             <text class="goods-price">¥{{item.price}}</text>
             <text class="goods-subtotal">小计 ¥{{item.subtotal}}</text>
+          </view>
+          <view
+            wx:if="{{item.packagingFeeEligible}}"
+            class="pack-toggle {{item.needPackaging ? 'active' : ''}}"
+            data-index="{{index}}"
+            catchtap="toggleGoodsPackaging">
+            <view class="pack-check {{item.needPackaging ? 'checked' : ''}}"></view>
+            <text>打包 +¥1/件</text>
           </view>
         </view>
         <view class="goods-edit-actions">

@@ -18,10 +18,22 @@ async function loadPackagingFeeCategoryIds() {
   return ids
 }
 
-function calcPackagingFeeFromGoods(goods, categoryIds) {
+function normalizeOrderGoods(goods, categoryIds) {
+  return (goods || []).map(item => {
+    const packagingFeeEligible = !!(item.categoryId && categoryIds.has(item.categoryId))
+    const needPackaging = packagingFeeEligible && item.needPackaging === true
+    return {
+      ...item,
+      packagingFeeEligible,
+      needPackaging
+    }
+  })
+}
+
+function calcPackagingFeeFromGoods(goods) {
   let itemCount = 0
   ;(goods || []).forEach(item => {
-    if (item.categoryId && categoryIds.has(item.categoryId)) {
+    if (item.needPackaging) {
       itemCount += Number(item.count) || 0
     }
   })
@@ -173,7 +185,8 @@ function generatePrintContent(order, ticketType = 'front') {
 
   if (order.goods && order.goods.length > 0) {
     order.goods.forEach(item => {
-      const dishName = escapeHtml(item.dishName || item.goodsName || '未知菜品')
+      const packMark = item.needPackaging ? '[打包]' : ''
+      const dishName = escapeHtml(`${packMark}${item.dishName || item.goodsName || '未知菜品'}`)
       const count = item.count || 1
       const basePrice = getItemBasePrice(item)
       const rightPart = `×${count}  ￥${basePrice.toFixed(2)}`
@@ -327,27 +340,24 @@ exports.main = async (event, context) => {
     const finalOrderType = orderType || (tableNumber ? 'dineIn' : 'takeOut')
     const date = new Date()
     const orderTotal = Number(totalPrice) || 0
-    let packagingFee = 0
-    let packagingFeeItemCount = 0
-    if (finalOrderType === 'takeOut') {
-      const categoryIds = await loadPackagingFeeCategoryIds()
-      const calculated = calcPackagingFeeFromGoods(orderGoods, categoryIds)
-      packagingFee = calculated.packagingFee
-      packagingFeeItemCount = calculated.packagingFeeItemCount
+    const categoryIds = await loadPackagingFeeCategoryIds()
+    const normalizedGoods = normalizeOrderGoods(orderGoods, categoryIds)
+    const calculated = calcPackagingFeeFromGoods(normalizedGoods)
+    const packagingFee = calculated.packagingFee
+    const packagingFeeItemCount = calculated.packagingFeeItemCount
 
-      const clientFee = clientPackagingFee != null && clientPackagingFee !== ''
-        ? Math.max(0, Number(clientPackagingFee) || 0)
-        : null
-      const clientCount = clientPackagingFeeItemCount != null && clientPackagingFeeItemCount !== ''
-        ? Math.max(0, parseInt(clientPackagingFeeItemCount, 10) || 0)
-        : null
+    const clientFee = clientPackagingFee != null && clientPackagingFee !== ''
+      ? Math.max(0, Number(clientPackagingFee) || 0)
+      : null
+    const clientCount = clientPackagingFeeItemCount != null && clientPackagingFeeItemCount !== ''
+      ? Math.max(0, parseInt(clientPackagingFeeItemCount, 10) || 0)
+      : null
 
-      if (clientFee != null && Math.abs(clientFee - packagingFee) > 0.001) {
-        return { success: false, error: '打包费计算有误，请刷新后重试' }
-      }
-      if (clientCount != null && clientCount !== packagingFeeItemCount) {
-        return { success: false, error: '打包费件数计算有误，请刷新后重试' }
-      }
+    if (clientFee != null && Math.abs(clientFee - packagingFee) > 0.001) {
+      return { success: false, error: '打包费计算有误，请刷新后重试' }
+    }
+    if (clientCount != null && clientCount !== packagingFeeItemCount) {
+      return { success: false, error: '打包费件数计算有误，请刷新后重试' }
     }
     const orderFinal = orderTotal + packagingFee
     if (clientFinalPrice != null && clientFinalPrice !== '' && Math.abs(Number(clientFinalPrice) - orderFinal) > 0.001) {
@@ -357,7 +367,7 @@ exports.main = async (event, context) => {
 
     const orderData = {
       type: 'order',
-      goods: orderGoods,
+      goods: normalizedGoods,
       totalPrice: orderTotal,
       packagingFee,
       packagingFeeItemCount,

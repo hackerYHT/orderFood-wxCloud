@@ -19,6 +19,7 @@
         打包
       </view>
     </view>
+    <view class="section-tip">整单快捷勾选；混单可在下方菜品单独勾选「打包」</view>
   </view>
 
   <view class="section">
@@ -74,7 +75,7 @@
       <view class="edit-order-btn" bind:tap="editOrder">修改</view>
     </view>
     <view class="goods-list">
-      <view class="goods-item" wx:for="{{orderGoods}}" wx:key="dishId">
+      <view class="goods-item" wx:for="{{orderGoods}}" wx:key="index">
         <image class="goods-image" src="{{item.dishImage}}" mode="aspectFill"></image>
         <view class="goods-info">
           <view class="goods-name">{{item.dishName}}</view>
@@ -91,6 +92,14 @@
             <text class="goods-price">¥{{item.price}}</text>
             <text class="goods-count">×{{item.count}}</text>
           </view>
+          <view
+            wx:if="{{item.packagingFeeEligible}}"
+            class="pack-toggle {{item.needPackaging ? 'active' : ''}}"
+            data-index="{{index}}"
+            catch:tap="toggleGoodsPackaging">
+            <view class="pack-check {{item.needPackaging ? 'checked' : ''}}"></view>
+            <text>打包 +¥1/件</text>
+          </view>
         </view>
         <view class="goods-subtotal">
           ¥{{item.subtotal}}
@@ -105,7 +114,7 @@
         <text class="price-label">商品小计</text>
         <text class="price-value">¥{{priceHelper.formatPrice(totalPrice)}}</text>
       </view>
-      <view class="price-item" wx:if="{{orderType === 'takeOut' && packagingFeeItemCount > 0}}">
+      <view class="price-item" wx:if="{{packagingFeeItemCount > 0}}">
         <text class="price-label">打包费（{{packagingFeeItemCount}}件）</text>
         <text class="price-value">¥{{priceHelper.formatPrice(packagingFee)}}</text>
       </view>

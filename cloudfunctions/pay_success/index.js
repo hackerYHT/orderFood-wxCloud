@@ -108,7 +108,8 @@ function generatePrintContent(order) {
   // 商品列表
   if (order.goods && order.goods.length > 0) {
     order.goods.forEach(item => {
-      const dishName = escapeHtml(item.dishName || item.goodsName || '未知菜品')
+      const packMark = item.needPackaging ? '[打包]' : ''
+      const dishName = escapeHtml(`${packMark}${item.dishName || item.goodsName || '未知菜品'}`)
       const count = item.count || 1
       // 确保价格格式正确，避免小数点0换行
       const price = parseFloat(item.price || 0).toFixed(2)

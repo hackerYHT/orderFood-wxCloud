@@ -152,5 +152,33 @@ Page({
     } finally {
       wx.hideLoading()
     }
+  },
+
+  deleteOrder(e) {
+    const { id, queue } = e.currentTarget.dataset
+    if (!id) return
+
+    const queueText = queue ? `取餐号 #${queue}` : '该订单'
+    wx.showModal({
+      title: '确认删除',
+      content: `确定删除${queueText}吗？删除后不可恢复。`,
+      confirmColor: '#e54d42',
+      success: async (res) => {
+        if (!res.confirm) return
+
+        wx.showLoading({ title: '删除中...' })
+        try {
+          await db.collection('order').doc(id).remove()
+          const orderList = this.data.orderList.filter(order => order._id !== id)
+          this.setData({ orderList })
+          wx.showToast({ title: '已删除', icon: 'success' })
+        } catch (err) {
+          console.error('删除订单失败', err)
+          wx.showToast({ title: '删除失败', icon: 'none' })
+        } finally {
+          wx.hideLoading()
+        }
+      }
+    })
   }
 })

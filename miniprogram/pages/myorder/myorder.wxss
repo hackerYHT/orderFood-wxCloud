@@ -342,9 +342,10 @@
 
 .order-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
-  gap: 20rpx;
+  gap: 16rpx;
 }
 
 .order-price {
@@ -389,6 +390,11 @@
 .action-btn.edit {
   background: rgba(56, 178, 172, 0.1);
   color: #38b2ac;
+}
+
+.action-btn.delete {
+  background: rgba(229, 77, 66, 0.1);
+  color: #e54d42;
 }
 
 .action-btn.pay-toggle.paid {

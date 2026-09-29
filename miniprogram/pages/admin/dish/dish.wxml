@@ -112,7 +112,7 @@
         <view class="form-item">
           <view class="form-label">
             打包时每件+1元
-            <text class="label-tip">（该分类菜品选择「打包」时按件加收）</text>
+            <text class="label-tip">（该分类菜品可在下单时勾选「打包」加收）</text>
           </view>
           <switch checked="{{currentCategory.packagingFee}}" bindchange="onCategoryPackagingFeeChange" color="#e54d42"/>
         </view>

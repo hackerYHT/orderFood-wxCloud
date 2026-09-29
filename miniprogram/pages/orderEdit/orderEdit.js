@@ -4,6 +4,8 @@ const {
   TABLE_PICKER_OPTIONS,
   calcOrderPrices,
   normalizeGoodsList,
+  applyOrderTypePackagingDefaults,
+  migrateNeedPackagingFromOrderType,
   resolveTablePickerIndex
 } = require('../../utils/orderGoods.js')
 
@@ -93,9 +95,13 @@ Page({
   },
 
   applyOrderState(order) {
-    const goods = normalizeGoodsList(order.goods)
     const orderType = order.orderType || (order.tableNumber ? 'dineIn' : 'takeOut')
-    const { totalPrice, packagingFee, packagingFeeItemCount, finalPrice } = calcOrderPrices(
+    const goods = migrateNeedPackagingFromOrderType(
+      order.goods,
+      orderType,
+      this.data.packagingFeeCategories
+    )
+    const { totalPrice, packagingFee, packagingFeeItemCount, finalPrice, goods: list } = calcOrderPrices(
       goods,
       orderType,
       this.data.packagingFeeCategories
@@ -103,7 +109,7 @@ Page({
     const { tableNumber, tablePickerIndex } = resolveTablePickerIndex(order.tableNumber)
 
     this.setData({
-      orderGoods: goods,
+      orderGoods: list,
       orderType,
       totalPrice,
       packagingFee,
@@ -132,9 +138,8 @@ Page({
 
   recalcAndSet(goods, orderType) {
     const nextType = orderType != null ? orderType : this.data.orderType
-    const list = normalizeGoodsList(goods)
-    const { totalPrice, packagingFee, packagingFeeItemCount, finalPrice } = calcOrderPrices(
-      list,
+    const { totalPrice, packagingFee, packagingFeeItemCount, finalPrice, goods: list } = calcOrderPrices(
+      goods,
       nextType,
       this.data.packagingFeeCategories
     )
@@ -151,7 +156,21 @@ Page({
 
   selectOrderType(e) {
     const orderType = e.currentTarget.dataset.value
-    this.recalcAndSet(this.data.orderGoods, orderType)
+    const goods = applyOrderTypePackagingDefaults(
+      this.data.orderGoods,
+      orderType,
+      this.data.packagingFeeCategories
+    )
+    this.recalcAndSet(goods, orderType)
+  },
+
+  toggleGoodsPackaging(e) {
+    const index = Number(e.currentTarget.dataset.index)
+    const goods = [...this.data.orderGoods]
+    const item = goods[index]
+    if (!item || !item.packagingFeeEligible) return
+    goods[index] = { ...item, needPackaging: !item.needPackaging }
+    this.recalcAndSet(goods)
   },
 
   onTableNumberChange(e) {
@@ -221,14 +240,14 @@ Page({
   async saveOrder() {
     if (this.data.saving) return
 
-    const goods = normalizeGoodsList(this.data.orderGoods)
+    const goods = normalizeGoodsList(this.data.orderGoods, this.data.packagingFeeCategories)
     if (!goods.length) {
       wx.showToast({ title: '请至少保留一个菜品', icon: 'none' })
       return
     }
 
     const orderType = this.data.orderType || (this.data.tableNumber ? 'dineIn' : 'takeOut')
-    const { totalPrice, packagingFee, packagingFeeItemCount, finalPrice } = calcOrderPrices(
+    const { totalPrice, packagingFee, packagingFeeItemCount, finalPrice, goods: list } = calcOrderPrices(
       goods,
       orderType,
       this.data.packagingFeeCategories
@@ -240,7 +259,7 @@ Page({
     try {
       await db.collection('order').doc(this.data.orderId).update({
         data: {
-          goods,
+          goods: list,
           totalPrice,
           packagingFee,
           packagingFeeItemCount,

@@ -4,7 +4,9 @@ const { formatTagLabelSuffix } = require('../../utils/price.js')
 const {
   TABLE_OPTIONS,
   TABLE_PICKER_OPTIONS,
-  calcOrderPrices
+  calcOrderPrices,
+  normalizeGoodsList,
+  applyOrderTypePackagingDefaults
 } = require('../../utils/orderGoods.js')
 
 Page({
@@ -42,10 +44,22 @@ Page({
     }
   },
 
-  recalcPrices(orderType, orderGoods) {
-    const type = orderType != null ? orderType : this.data.orderType
+  recalcPrices(orderGoods) {
     const goods = orderGoods != null ? orderGoods : this.data.orderGoods
-    return calcOrderPrices(goods, type, this.data.packagingFeeCategories)
+    return calcOrderPrices(goods, this.data.orderType, this.data.packagingFeeCategories)
+  },
+
+  applyPrices(goods, extra = {}) {
+    const { totalPrice, packagingFee, packagingFeeItemCount, finalPrice, goods: list } = this.recalcPrices(goods)
+    this.setData({
+      orderGoods: list,
+      totalPrice,
+      packagingFee,
+      packagingFeeItemCount,
+      finalPrice,
+      ...extra
+    })
+    this.updateCanSubmit()
   },
 
   loadCartData() {
@@ -112,29 +126,31 @@ Page({
           count: item.count,
           tags: tagsArray,
           selectedOptions: item.selectedOptions || [],
+          needPackaging: item.needPackaging === true,
           subtotal: (unitPrice * item.count).toFixed(2)
         })
       }
 
       const orderType = cartData.orderType || 'dineIn'
-      const { totalPrice, packagingFee, packagingFeeItemCount, finalPrice } = this.recalcPrices(orderType, goodsList)
+      const annotated = normalizeGoodsList(goodsList, this.data.packagingFeeCategories)
+      // 从购物车进入时，按整单类型快捷勾选；若购物车已有单项勾选则保留
+      const hasExplicit = goodsList.some(item => item.needPackaging === true)
+      const withPackaging = hasExplicit
+        ? annotated
+        : applyOrderTypePackagingDefaults(annotated, orderType, this.data.packagingFeeCategories)
+
       const rawTableNumber = (cartData.tableNumber || '').trim()
       const tableNumber = TABLE_OPTIONS.includes(rawTableNumber) ? rawTableNumber : ''
       const tablePickerIndex = tableNumber ? TABLE_PICKER_OPTIONS.indexOf(tableNumber) : 0
-      this.setData({
-        orderGoods: goodsList,
-        totalPrice,
-        packagingFee,
-        packagingFeeItemCount,
-        finalPrice,
+
+      this.setData({ orderType })
+      this.applyPrices(withPackaging, {
         tableNumber,
         tablePickerIndex: tablePickerIndex >= 0 ? tablePickerIndex : 0,
-        orderType,
         remark: cartData.remark || ''
       })
 
       wx.removeStorageSync('settleCartData')
-      this.updateCanSubmit()
     } catch (err) {
       console.error('加载购物车数据失败', err)
       wx.showToast({ title: '加载失败', icon: 'none' })
@@ -144,11 +160,22 @@ Page({
 
   selectOrderType(e) {
     const orderType = e.currentTarget.dataset.value
-    const prices = this.recalcPrices(orderType)
-    this.setData({
+    const goods = applyOrderTypePackagingDefaults(
+      this.data.orderGoods,
       orderType,
-      ...prices
-    })
+      this.data.packagingFeeCategories
+    )
+    this.setData({ orderType })
+    this.applyPrices(goods)
+  },
+
+  toggleGoodsPackaging(e) {
+    const index = Number(e.currentTarget.dataset.index)
+    const goods = [...this.data.orderGoods]
+    const item = goods[index]
+    if (!item || !item.packagingFeeEligible) return
+    goods[index] = { ...item, needPackaging: !item.needPackaging }
+    this.applyPrices(goods)
   },
 
   onTableNumberChange(e) {

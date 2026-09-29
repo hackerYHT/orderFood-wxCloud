@@ -79,6 +79,14 @@
           >
             {{item.pay_status ? '改为未支付' : '改为已支付'}}
           </view>
+          <view
+            class="action-btn delete"
+            data-id="{{item._id}}"
+            data-queue="{{item.queueNumber}}"
+            catchtap="deleteOrder"
+          >
+            删除
+          </view>
           <view class="order-price">
             <text class="price-label">合计：</text>
             <text class="price-num">¥{{item.finalPrice}}</text>
