@@ -1,9 +1,55 @@
 // pages/myorder/myorder.js
 const db = wx.cloud.database()
 
+function pad(n) {
+  return n < 10 ? '0' + n : '' + n
+}
+
+function toDate(time) {
+  if (!time) return null
+  if (time instanceof Date) return time
+  return new Date(time)
+}
+
+function getDateKey(time) {
+  const date = toDate(time)
+  if (!date || Number.isNaN(date.getTime())) return 'unknown'
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function getTodayKey() {
+  return getDateKey(new Date())
+}
+
+function formatDateLabel(dateKey) {
+  if (!dateKey || dateKey === 'unknown') return '未知日期'
+  const [y, m, d] = dateKey.split('-').map(Number)
+  const today = new Date()
+  const todayKey = getTodayKey()
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)
+  const yesterdayKey = getDateKey(yesterday)
+
+  const weekNames = ['日', '一', '二', '三', '四', '五', '六']
+  const date = new Date(y, m - 1, d)
+  const week = weekNames[date.getDay()]
+  const md = `${m}月${d}日`
+
+  if (dateKey === todayKey) return `今天 ${md} 周${week}`
+  if (dateKey === yesterdayKey) return `昨天 ${md} 周${week}`
+  if (y === today.getFullYear()) return `${md} 周${week}`
+  return `${y}年${md} 周${week}`
+}
+
+function formatTime(time) {
+  const date = toDate(time)
+  if (!date || Number.isNaN(date.getTime())) return ''
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 Page({
   data: {
     orderList: [],
+    orderGroups: [],
     orderPage: 0,
     orderPageSize: 20,
     orderHasMore: true,
@@ -13,11 +59,63 @@ Page({
   },
 
   onLoad() {
+    this._expandedDates = {}
     this.loadOrders()
   },
 
   onShow() {
     this.loadOrders()
+  },
+
+  buildOrderGroups(orderList) {
+    const todayKey = getTodayKey()
+    const expandedMap = this._expandedDates || {}
+    const groupMap = new Map()
+
+    ;(orderList || []).forEach(order => {
+      const dateKey = order.dateKey || getDateKey(order.createTime)
+      if (!groupMap.has(dateKey)) {
+        const expanded = expandedMap[dateKey] != null
+          ? !!expandedMap[dateKey]
+          : dateKey === todayKey
+        expandedMap[dateKey] = expanded
+        groupMap.set(dateKey, {
+          dateKey,
+          dateLabel: formatDateLabel(dateKey),
+          expanded,
+          isToday: dateKey === todayKey,
+          orders: []
+        })
+      }
+      groupMap.get(dateKey).orders.push(order)
+    })
+
+    this._expandedDates = expandedMap
+
+    const groups = Array.from(groupMap.values()).map(group => ({
+      ...group,
+      count: group.orders.length,
+      expanded: !!expandedMap[group.dateKey]
+    }))
+
+    // 日期降序（与订单 createTime desc 一致）
+    groups.sort((a, b) => {
+      if (a.dateKey === b.dateKey) return 0
+      if (a.dateKey === 'unknown') return 1
+      if (b.dateKey === 'unknown') return -1
+      return a.dateKey < b.dateKey ? 1 : -1
+    })
+
+    return groups
+  },
+
+  setOrderList(orderList, extra = {}) {
+    const orderGroups = this.buildOrderGroups(orderList)
+    this.setData({
+      orderList,
+      orderGroups,
+      ...extra
+    })
   },
 
   async loadOrders(append = false) {
@@ -54,28 +152,19 @@ Page({
         .limit(pageSize)
         .get()
 
-      const formatTime = (time) => {
-        if (!time) return ''
-        const date = time instanceof Date ? time : new Date(time)
-        const pad = (n) => (n < 10 ? '0' + n : n)
-        const y = date.getFullYear()
-        const m = pad(date.getMonth() + 1)
-        const d = pad(date.getDate())
-        const hh = pad(date.getHours())
-        const mm = pad(date.getMinutes())
-        return `${y}-${m}-${d} ${hh}:${mm}`
-      }
-
-      const list = (res.data || []).map(order => ({
-        ...order,
-        createTimeText: order.createTime ? formatTime(order.createTime) : ''
-      }))
+      const list = (res.data || []).map(order => {
+        const dateKey = getDateKey(order.createTime)
+        return {
+          ...order,
+          dateKey,
+          createTimeText: order.createTime ? formatTime(order.createTime) : ''
+        }
+      })
 
       const newList = append ? this.data.orderList.concat(list) : list
       const hasMore = list.length === pageSize
 
-      this.setData({
-        orderList: newList,
+      this.setOrderList(newList, {
         orderPage: page,
         orderHasMore: hasMore
       })
@@ -86,6 +175,22 @@ Page({
       wx.hideLoading()
       this.setData({ loadingOrders: false })
     }
+  },
+
+  toggleDateGroup(e) {
+    const dateKey = e.currentTarget.dataset.key
+    if (!dateKey) return
+
+    const expanded = !(this._expandedDates && this._expandedDates[dateKey])
+    this._expandedDates = {
+      ...(this._expandedDates || {}),
+      [dateKey]: expanded
+    }
+
+    const orderGroups = (this.data.orderGroups || []).map(group => (
+      group.dateKey === dateKey ? { ...group, expanded } : group
+    ))
+    this.setData({ orderGroups })
   },
 
   onReachBottom() {
@@ -103,7 +208,8 @@ Page({
       payFilter: index,
       orderPage: 0,
       orderHasMore: true,
-      orderList: []
+      orderList: [],
+      orderGroups: []
     }, () => {
       this.loadOrders()
     })
@@ -141,7 +247,7 @@ Page({
         orderList = orderList.filter(order => order._id !== id)
       }
 
-      this.setData({ orderList })
+      this.setOrderList(orderList)
       wx.showToast({
         title: newStatus ? '已标记为已支付' : '已标记为未支付',
         icon: 'none'
@@ -170,7 +276,7 @@ Page({
         try {
           await db.collection('order').doc(id).remove()
           const orderList = this.data.orderList.filter(order => order._id !== id)
-          this.setData({ orderList })
+          this.setOrderList(orderList)
           wx.showToast({ title: '已删除', icon: 'success' })
         } catch (err) {
           console.error('删除订单失败', err)

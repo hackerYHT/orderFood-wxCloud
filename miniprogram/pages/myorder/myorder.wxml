@@ -19,82 +19,99 @@
   </view>
 
   <view class="order-list">
-    <view class="order-item" wx:for="{{orderList}}" wx:key="_id">
-      <view class="order-header">
-        <view class="order-type">
-          <text class="queue-number" wx:if="{{item.queueNumber}}">#{{item.queueNumber}}</text>
-          <text wx:if="{{item.orderType === 'dineIn'}}">🍽️ 堂食订单</text>
-          <text wx:elif="{{item.orderType === 'takeOut'}}">📦 打包订单</text>
-          <text wx:else>🍽️ 点餐订单</text>
+    <view class="date-group" wx:for="{{orderGroups}}" wx:key="dateKey" wx:for-item="group">
+      <view
+        class="date-header {{group.isToday ? 'today' : ''}} {{group.expanded ? 'expanded' : ''}}"
+        data-key="{{group.dateKey}}"
+        bindtap="toggleDateGroup"
+      >
+        <view class="date-header-left">
+          <text class="date-arrow">{{group.expanded ? '▼' : '▶'}}</text>
+          <text class="date-label">{{group.dateLabel}}</text>
+          <text class="date-count">{{group.count}}单</text>
         </view>
-        <view class="order-status-row">
-          <view class="pay-status {{item.pay_status ? 'paid' : 'unpaid'}}">
-            {{item.pay_status ? '已支付' : '未支付'}}
-          </view>
-          <view class="print-status" wx:if="{{item.printStatus === 2}}">已打印</view>
-          <view class="print-status pending" wx:elif="{{item.printStatus}}">打印异常</view>
-        </view>
+        <text class="date-toggle-tip">{{group.expanded ? '收起' : '展开'}}</text>
       </view>
 
-      <view class="order-content">
-        <view class="goods-list">
-          <view class="goods-item" wx:for="{{item.goods}}" wx:for-item="goods" wx:key="goodsId">
-            <image class="goods-image" src="{{goods.dishImage}}" mode="aspectFill"></image>
-            <view class="goods-info">
-              <view class="goods-name">{{goods.dishName}}</view>
-              <view class="goods-tags" wx:if="{{goods.tags && goods.tags.length > 0}}">
-                <van-tag type="danger" wx:for="{{goods.tags}}" wx:key="index" wx:for-item="tagVal">{{tagVal}}</van-tag>
+      <view class="date-orders" wx:if="{{group.expanded}}">
+        <view class="order-item" wx:for="{{group.orders}}" wx:key="_id" wx:for-item="item">
+          <view class="order-header">
+            <view class="order-type">
+              <text class="queue-number" wx:if="{{item.queueNumber}}">#{{item.queueNumber}}</text>
+              <text wx:if="{{item.orderType === 'dineIn'}}">🍽️ 堂食订单</text>
+              <text wx:elif="{{item.orderType === 'takeOut'}}">📦 打包订单</text>
+              <text wx:else>🍽️ 点餐订单</text>
+            </view>
+            <view class="order-status-row">
+              <view class="pay-status {{item.pay_status ? 'paid' : 'unpaid'}}">
+                {{item.pay_status ? '已支付' : '未支付'}}
               </view>
-              <view class="goods-detail">
-                <text class="goods-price">¥{{goods.price}}</text>
-                <text class="goods-count">x{{goods.count}}</text>
-              </view>
+              <view class="print-status" wx:if="{{item.printStatus === 2}}">已打印</view>
+              <view class="print-status pending" wx:elif="{{item.printStatus}}">打印异常</view>
             </view>
           </view>
-        </view>
 
-        <view class="order-remark" wx:if="{{item.remark}}">
-          备注：{{item.remark}}
-        </view>
-      </view>
+          <view class="order-content">
+            <view class="goods-list">
+              <view class="goods-item" wx:for="{{item.goods}}" wx:for-item="goods" wx:key="goodsId">
+                <image class="goods-image" src="{{goods.dishImage}}" mode="aspectFill"></image>
+                <view class="goods-info">
+                  <view class="goods-name">{{goods.dishName}}</view>
+                  <view class="goods-tags" wx:if="{{goods.tags && goods.tags.length > 0}}">
+                    <van-tag type="danger" wx:for="{{goods.tags}}" wx:key="index" wx:for-item="tagVal">{{tagVal}}</van-tag>
+                  </view>
+                  <view class="goods-detail">
+                    <text class="goods-price">¥{{goods.price}}</text>
+                    <text class="goods-count">x{{goods.count}}</text>
+                  </view>
+                </view>
+              </view>
+            </view>
 
-      <view class="order-footer">
-        <view class="order-info">
-          <view class="order-time">{{item.createTimeText}}</view>
-          <view class="order-table-code" wx:if="{{item.tableNumber}}">桌号：{{item.tableNumber}}</view>
-        </view>
-        <view class="order-actions">
-          <view
-            class="action-btn edit"
-            data-id="{{item._id}}"
-            catchtap="goEditOrder"
-          >
-            编辑
+            <view class="order-remark" wx:if="{{item.remark}}">
+              备注：{{item.remark}}
+            </view>
           </view>
-          <view
-            class="action-btn pay-toggle {{item.pay_status ? 'paid' : 'unpaid'}}"
-            data-id="{{item._id}}"
-            data-status="{{item.pay_status}}"
-            catchtap="togglePayStatus"
-          >
-            {{item.pay_status ? '改为未支付' : '改为已支付'}}
-          </view>
-          <view
-            class="action-btn delete"
-            data-id="{{item._id}}"
-            data-queue="{{item.queueNumber}}"
-            catchtap="deleteOrder"
-          >
-            删除
-          </view>
-          <view class="order-price">
-            <text class="price-label">合计：</text>
-            <text class="price-num">¥{{item.finalPrice}}</text>
+
+          <view class="order-footer">
+            <view class="order-info">
+              <view class="order-time">{{item.createTimeText}}</view>
+              <view class="order-table-code" wx:if="{{item.tableNumber}}">桌号：{{item.tableNumber}}</view>
+            </view>
+            <view class="order-actions">
+              <view
+                class="action-btn edit"
+                data-id="{{item._id}}"
+                catchtap="goEditOrder"
+              >
+                编辑
+              </view>
+              <view
+                class="action-btn pay-toggle {{item.pay_status ? 'paid' : 'unpaid'}}"
+                data-id="{{item._id}}"
+                data-status="{{item.pay_status}}"
+                catchtap="togglePayStatus"
+              >
+                {{item.pay_status ? '改为未支付' : '改为已支付'}}
+              </view>
+              <view
+                class="action-btn delete"
+                data-id="{{item._id}}"
+                data-queue="{{item.queueNumber}}"
+                catchtap="deleteOrder"
+              >
+                删除
+              </view>
+              <view class="order-price">
+                <text class="price-label">合计：</text>
+                <text class="price-num">¥{{item.finalPrice}}</text>
+              </view>
+            </view>
           </view>
         </view>
       </view>
     </view>
 
-    <van-empty wx:if="{{orderList.length === 0}}" description="暂无订单" />
+    <van-empty wx:if="{{orderGroups.length === 0}}" description="暂无订单" />
   </view>
 </view>
