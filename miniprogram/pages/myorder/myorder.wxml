@@ -2,7 +2,7 @@
 <view class="page">
   <view class="page-header">
     <text class="page-title">打印订单记录</text>
-    <text class="page-subtitle">店员口头点餐提交后自动生成</text>
+    <text class="page-subtitle">店员口头点餐提交后自动生成 · 点 ○/✓ 标记出餐</text>
   </view>
 
   <view class="tabs">
@@ -52,11 +52,39 @@
           </view>
 
           <view class="order-content">
+            <view class="serve-toolbar" wx:if="{{item.goods && item.goods.length > 0}}">
+              <text class="serve-progress">出餐 {{item.servedCount || 0}}/{{item.goods.length}}</text>
+              <view
+                class="serve-all-btn {{item.allServed ? 'on' : ''}}"
+                data-order-id="{{item._id}}"
+                data-all="{{item.allServed}}"
+                catchtap="markAllGoodsServed"
+              >
+                {{item.allServed ? '✓ 取消全出' : '✓ 全部出餐'}}
+              </view>
+            </view>
             <view class="goods-list">
-              <view class="goods-item" wx:for="{{item.goods}}" wx:for-item="goods" wx:key="goodsId">
+              <view
+                class="goods-item {{goods.served ? 'served' : ''}}"
+                wx:for="{{item.goods}}"
+                wx:for-item="goods"
+                wx:for-index="goodsIndex"
+                wx:key="goodsIndex"
+              >
+                <view
+                  class="serve-mark {{goods.served ? 'on' : 'off'}}"
+                  data-order-id="{{item._id}}"
+                  data-index="{{goodsIndex}}"
+                  catchtap="toggleGoodsServed"
+                >
+                  <text class="serve-symbol">{{goods.served ? '✓' : '○'}}</text>
+                </view>
                 <image class="goods-image" src="{{goods.dishImage}}" mode="aspectFill"></image>
                 <view class="goods-info">
-                  <view class="goods-name">{{goods.dishName}}</view>
+                  <view class="goods-name-row">
+                    <text class="goods-name">{{goods.dishName}}</text>
+                    <text class="serve-label {{goods.served ? 'on' : ''}}">{{goods.served ? '已出餐' : '未出餐'}}</text>
+                  </view>
                   <view class="goods-tags" wx:if="{{goods.tags && goods.tags.length > 0}}">
                     <van-tag type="danger" wx:for="{{goods.tags}}" wx:key="index" wx:for-item="tagVal">{{tagVal}}</van-tag>
                   </view>

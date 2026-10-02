@@ -46,6 +46,16 @@ function formatTime(time) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+function enrichServeStatus(order) {
+  const goods = Array.isArray(order.goods) ? order.goods : []
+  const servedCount = goods.filter(item => item && item.served === true).length
+  return {
+    ...order,
+    servedCount,
+    allServed: goods.length > 0 && servedCount === goods.length
+  }
+}
+
 Page({
   data: {
     orderList: [],
@@ -73,7 +83,8 @@ Page({
     const groupMap = new Map()
 
     ;(orderList || []).forEach(order => {
-      const dateKey = order.dateKey || getDateKey(order.createTime)
+      const enriched = enrichServeStatus(order)
+      const dateKey = enriched.dateKey || getDateKey(enriched.createTime)
       if (!groupMap.has(dateKey)) {
         const expanded = expandedMap[dateKey] != null
           ? !!expandedMap[dateKey]
@@ -87,7 +98,7 @@ Page({
           orders: []
         })
       }
-      groupMap.get(dateKey).orders.push(order)
+      groupMap.get(dateKey).orders.push(enriched)
     })
 
     this._expandedDates = expandedMap
@@ -110,9 +121,10 @@ Page({
   },
 
   setOrderList(orderList, extra = {}) {
-    const orderGroups = this.buildOrderGroups(orderList)
+    const normalizedList = (orderList || []).map(enrichServeStatus)
+    const orderGroups = this.buildOrderGroups(normalizedList)
     this.setData({
-      orderList,
+      orderList: normalizedList,
       orderGroups,
       ...extra
     })
@@ -257,6 +269,73 @@ Page({
       wx.showToast({ title: '更新失败', icon: 'none' })
     } finally {
       wx.hideLoading()
+    }
+  },
+
+  async toggleGoodsServed(e) {
+    const orderId = e.currentTarget.dataset.orderId
+    const goodsIndex = Number(e.currentTarget.dataset.index)
+    if (!orderId || Number.isNaN(goodsIndex) || goodsIndex < 0) return
+
+    const order = this.data.orderList.find(item => item._id === orderId)
+    if (!order || !Array.isArray(order.goods) || !order.goods[goodsIndex]) return
+
+    const nextServed = !(order.goods[goodsIndex].served === true)
+    const nextGoods = order.goods.map((goods, index) => (
+      index === goodsIndex ? { ...goods, served: nextServed } : goods
+    ))
+
+    try {
+      await db.collection('order').doc(orderId).update({
+        data: { goods: nextGoods }
+      })
+
+      const orderList = this.data.orderList.map(item => (
+        item._id === orderId ? { ...item, goods: nextGoods } : item
+      ))
+      this.setOrderList(orderList)
+      wx.showToast({
+        title: nextServed ? '已出餐' : '取消出餐',
+        icon: 'none',
+        duration: 800
+      })
+    } catch (err) {
+      console.error('更新出餐状态失败', err)
+      wx.showToast({ title: '更新失败', icon: 'none' })
+    }
+  },
+
+  async markAllGoodsServed(e) {
+    const orderId = e.currentTarget.dataset.orderId
+    const allServed = e.currentTarget.dataset.all === true || e.currentTarget.dataset.all === 'true'
+    if (!orderId) return
+
+    const order = this.data.orderList.find(item => item._id === orderId)
+    if (!order || !Array.isArray(order.goods) || order.goods.length === 0) return
+
+    const nextServed = !allServed
+    const nextGoods = order.goods.map(goods => ({
+      ...goods,
+      served: nextServed
+    }))
+
+    try {
+      await db.collection('order').doc(orderId).update({
+        data: { goods: nextGoods }
+      })
+
+      const orderList = this.data.orderList.map(item => (
+        item._id === orderId ? { ...item, goods: nextGoods } : item
+      ))
+      this.setOrderList(orderList)
+      wx.showToast({
+        title: nextServed ? '已全部出餐' : '已取消全出',
+        icon: 'none',
+        duration: 1000
+      })
+    } catch (err) {
+      console.error('批量更新出餐状态失败', err)
+      wx.showToast({ title: '更新失败', icon: 'none' })
     }
   },
 
