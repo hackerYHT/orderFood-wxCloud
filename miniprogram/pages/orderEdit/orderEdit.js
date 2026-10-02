@@ -1,4 +1,5 @@
 const db = wx.cloud.database()
+const dishSpecEditor = require('../../utils/dishSpecEditor.js')
 const {
   TABLE_OPTIONS,
   TABLE_PICKER_OPTIONS,
@@ -10,6 +11,8 @@ const {
 } = require('../../utils/orderGoods.js')
 
 Page({
+  ...dishSpecEditor,
+
   data: {
     orderId: '',
     orderGoods: [],
@@ -25,10 +28,17 @@ Page({
     remark: '',
     pay_status: false,
     queueNumber: '',
-    saving: false
+    saving: false,
+    showTagModal: false,
+    editIndex: -1,
+    currentDish: null,
+    selectedTags: {},
+    modalDishCount: 1,
+    modalTotalPrice: '0.00'
   },
 
   onLoad(options) {
+    this.initDishSpecEditor()
     const orderId = options.orderId || ''
     this.setData({ orderId })
     if (!orderId) {
@@ -49,12 +59,15 @@ Page({
   },
 
   onUnload() {
-    // switchTab 时 onUnload 先于 tab 页激活，不能用 getCurrentPages 判断是否去 index
     if (wx.getStorageSync('editOrderReturnToIndex')) {
       wx.removeStorageSync('editOrderReturnToIndex')
       return
     }
     wx.removeStorageSync('editOrderContext')
+  },
+
+  applyGoodsUpdate(goods) {
+    this.recalcAndSet(goods)
   },
 
   async loadPackagingFeeCategories() {

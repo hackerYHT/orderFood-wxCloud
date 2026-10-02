@@ -91,6 +91,7 @@
           </view>
         </view>
         <view class="goods-edit-actions">
+          <view class="goods-edit-btn" catchtap="openEditGoods" data-index="{{index}}">编辑</view>
           <view class="qty-btn" bindtap="onGoodsDecrease" data-index="{{index}}">-</view>
           <text class="qty-num">{{item.count}}</text>
           <view class="qty-btn" bindtap="onGoodsIncrease" data-index="{{index}}">+</view>
@@ -123,6 +124,95 @@
       bindtap="saveOrder">
       <text wx:if="{{saving}}">保存中...</text>
       <text wx:else>保存修改</text>
+    </view>
+  </view>
+
+  <!-- 规格编辑弹窗（与购物车 / 确认打印一致） -->
+  <view class="modal-mask" wx:if="{{showTagModal}}" catchtap="closeTagModal">
+    <view class="modal-dialog dish-detail-modal" catchtap="stopPropagation">
+      <view class="modal-close" bindtap="closeTagModal">×</view>
+      <scroll-view class="modal-content" scroll-y>
+        <view class="dish-detail-header">
+          <image class="dish-detail-image" src="{{currentDish.imageUrl || currentDish.image}}" mode="aspectFill"></image>
+          <view class="dish-detail-info">
+            <view class="dish-detail-name">{{currentDish.name}}</view>
+            <view class="dish-detail-desc" wx:if="{{currentDish.description}}">{{currentDish.description}}</view>
+            <view class="dish-detail-price">
+              <text class="price-symbol">¥</text>
+              <text class="price-num">{{currentDish.price}}</text>
+            </view>
+          </view>
+        </view>
+
+        <block wx:for="{{currentDish.tags}}" wx:key="id" wx:for-item="tag">
+          <view class="tag-section">
+            <view class="tag-title">
+              {{tag.name}}
+              <text class="tag-type-label">{{tag.type === 'single' ? '(单选)' : '(多选)'}}</text>
+              <text class="tag-required-label" wx:if="{{tag.required}}">必选</text>
+            </view>
+
+            <view class="tag-options" wx:if="{{tag.type === 'single'}}">
+              <view
+                class="tag-option {{option.selected ? 'selected' : ''}}"
+                wx:for="{{tag.options}}"
+                wx:key="id"
+                wx:for-item="option"
+                bindtap="selectTagOption"
+                data-tag-id="{{tag.id}}"
+                data-option-id="{{option.id || option.dishId}}">
+                <text>{{option.name}}</text>
+                <text class="tag-option-price" wx:if="{{option.price > 0}}">{{priceHelper.formatTagOptionPrice(option.price)}}</text>
+              </view>
+            </view>
+
+            <view class="tag-options" wx:if="{{tag.type === 'multiple'}}">
+              <view
+                wx:for="{{tag.options}}"
+                wx:key="id"
+                wx:for-item="option"
+                class="tag-option {{option.selectedCount > 0 ? 'selected' : ''}}">
+                <view
+                  class="tag-option-main"
+                  bindtap="toggleTagOption"
+                  data-tag-id="{{tag.id}}"
+                  data-option-id="{{option.id || option.dishId}}">
+                  <text>{{option.name}}</text>
+                  <text class="tag-option-count" wx:if="{{option.selectedCount > 0}}">x{{option.selectedCount}}</text>
+                  <text class="tag-option-price" wx:if="{{option.price > 0}}">{{priceHelper.formatTagOptionPrice(option.price)}}</text>
+                </view>
+                <view
+                  class="tag-option-reduce"
+                  wx:if="{{option.selectedCount > 0}}"
+                  catchtap="reduceTagOption"
+                  data-tag-id="{{tag.id}}"
+                  data-option-id="{{option.id || option.dishId}}">-</view>
+              </view>
+            </view>
+          </view>
+        </block>
+
+        <view class="quantity-section">
+          <view class="quantity-label">数量</view>
+          <view class="quantity-controls">
+            <view class="quantity-btn {{modalDishCount <= 1 ? 'disabled' : ''}}" bindtap="decreaseModalCount">-</view>
+            <view class="quantity-num">{{modalDishCount}}</view>
+            <view class="quantity-btn" bindtap="increaseModalCount">+</view>
+          </view>
+        </view>
+      </scroll-view>
+
+      <view class="modal-footer-bar">
+        <view class="footer-price modal-price">
+          <text class="total-label">小计：</text>
+          <text class="price-symbol">¥</text>
+          <text class="price-num">{{modalTotalPrice}}</text>
+        </view>
+        <view class="modal-footer-actions">
+          <view class="modal-delete-btn" bindtap="removeEditGoods">删除</view>
+          <view class="add-cart-btn" bindtap="confirmEditGoods">确认修改</view>
+        </view>
+      </view>
     </view>
   </view>
 </view>

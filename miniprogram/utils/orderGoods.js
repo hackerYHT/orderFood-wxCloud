@@ -169,6 +169,7 @@ function cartToOrderGoods(cart, packagingFeeCategories) {
       tags: buildTagsArrayFromCartItem(item),
       selectedOptions: item.selectedOptions || [],
       needPackaging: item.needPackaging === true,
+      selectedTags: JSON.parse(JSON.stringify(item.tags || {})),
       subtotal: (unitPrice * item.count).toFixed(2)
     })
   }
@@ -189,7 +190,9 @@ function orderGoodsToCart(goods) {
         categoryName: item.categoryName || ''
       },
       count: item.count,
-      tags: {},
+      tags: item.selectedTags && typeof item.selectedTags === 'object'
+        ? JSON.parse(JSON.stringify(item.selectedTags))
+        : {},
       tagLabels: item.tags || [],
       selectedOptions: item.selectedOptions || [],
       unitPrice: item.price,
