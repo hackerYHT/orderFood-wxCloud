@@ -29,6 +29,7 @@ Page({
     selectedTags: {}, // 当前选择的标签 {tagId: [选项]}
     modalDishCount: 1, // 弹窗中选择的商品数量
     modalTotalPrice: 0, // 弹窗中商品小计
+    editingCartKey: '', // 正在编辑的购物车项 key，空表示新增
     showAuthModal: false, // 显示授权弹窗
     statusBarHeight: 0, // 状态栏高度
     tableNumber: '', // 桌码号
@@ -397,10 +398,79 @@ Page({
     // 总是显示弹窗，让用户选择数量
     this.setData({
       showTagModal: true,
+      editingCartKey: '',
       currentDish,
       selectedTags: selectedTags,
       modalDishCount: 1,
       modalTotalPrice: this.calculateModalTotalPrice(currentDish, selectedTags, 1)
+    })
+  },
+
+  // 从购物车点击菜品，编辑规格/数量
+  async editCartItem(e) {
+    const cartKey = e.currentTarget.dataset.id
+    const cartItem = this.data.cart[cartKey]
+    if (!cartItem) return
+
+    const dishId = cartItem.dishId || (cartItem.info && cartItem.info._id)
+    if (!dishId) return
+
+    let rawGoods = this.getGoodsById(dishId) || cartItem.info
+    if (!rawGoods || !rawGoods._id) {
+      wx.showToast({ title: '菜品信息缺失', icon: 'none' })
+      return
+    }
+
+    // 当前列表未缓存时，从数据库拉取最新菜品（含标签）
+    if (!this.getGoodsById(dishId)) {
+      try {
+        const res = await db.collection('dish').doc(dishId).get()
+        if (res.data && res.data.deleted !== true) {
+          this.dishById[dishId] = res.data
+          rawGoods = res.data
+        }
+      } catch (err) {
+        console.warn('拉取菜品详情失败，使用购物车快照', err)
+      }
+    }
+
+    // 购物车快照可能缺最新标签，优先用点餐列表中的菜品
+    try {
+      await this.ensureDishLookup(rawGoods)
+      const latest = this.getGoodsById(dishId)
+      if (latest) {
+        rawGoods = {
+          ...latest,
+          image: latest.image || latest.imageUrl || (cartItem.info && (cartItem.info.image || cartItem.info.imageUrl)) || '',
+          imageUrl: latest.imageUrl || latest.image || (cartItem.info && (cartItem.info.imageUrl || cartItem.info.image)) || ''
+        }
+      }
+    } catch (err) {
+      console.error('加载编辑菜品失败', err)
+    }
+
+    const categoryIds = collectCategoryIdsFromDishes([rawGoods])
+    const categoryDishesMap = categoryIds.length
+      ? await this.loadCategoryDishesMap(categoryIds)
+      : (this.categoryDishesMap || {})
+    const goods = this.normalizeDishTags(rawGoods, categoryDishesMap)
+
+    let selectedTags = JSON.parse(JSON.stringify(cartItem.tags || {}))
+    // 编辑订单回流的购物车可能只有 tagLabels、没有 tags，则回退默认项
+    if (!selectedTags || Object.keys(selectedTags).length === 0) {
+      selectedTags = this.buildDefaultSelectedTags(goods)
+    }
+
+    const currentDish = this.updateTagOptionSelectedState(goods, selectedTags)
+    const modalDishCount = Math.max(1, Number(cartItem.count) || 1)
+
+    this.setData({
+      showTagModal: true,
+      editingCartKey: cartKey,
+      currentDish,
+      selectedTags,
+      modalDishCount,
+      modalTotalPrice: this.calculateModalTotalPrice(currentDish, selectedTags, modalDishCount)
     })
   },
 
@@ -550,10 +620,10 @@ Page({
     })
   },
 
-  // 确认添加到购物车
+  // 确认添加到购物车 / 确认修改购物车项
   confirmAddToCart() {
-    const { currentDish, selectedTags, modalDishCount } = this.data
-    const cart = this.data.cart
+    const { currentDish, selectedTags, modalDishCount, editingCartKey } = this.data
+    const cart = { ...this.data.cart }
     
     // 验证必选标签
     if (currentDish.tags && currentDish.tags.length > 0) {
@@ -579,25 +649,63 @@ Page({
     const selectedOptions = this.getSelectedOptionList(currentDish, selectedTags)
     const tagLabels = this.buildTagLabels(currentDish, selectedTags)
     const unitPrice = this.calculateUnitPrice(currentDish, selectedTags)
-    
-    if (cart[cartKey]) {
-      cart[cartKey].count += modalDishCount
-    } else {
-      cart[cartKey] = {
-        info: currentDish,
-        count: modalDishCount,
-        tags: { ...selectedTags },
-        selectedOptions,
-        tagLabels: tagLabels, // 用于显示的标签数组
-        unitPrice,
-        basePrice: Number(currentDish.price) || 0,
-        extraPrice: unitPrice - (Number(currentDish.price) || 0),
-        dishId: currentDish._id // 保存原始菜品ID
-      }
+    const nextItem = {
+      info: currentDish,
+      count: modalDishCount,
+      tags: JSON.parse(JSON.stringify(selectedTags)),
+      selectedOptions,
+      tagLabels,
+      unitPrice,
+      basePrice: Number(currentDish.price) || 0,
+      extraPrice: unitPrice - (Number(currentDish.price) || 0),
+      dishId: currentDish._id
     }
-    
-    this.updateCart(cart)
+
+    if (editingCartKey) {
+      // 编辑：按原顺序重建对象，避免改规格后 key 变化导致该项跑到列表末尾
+      const mergeCount = (editingCartKey !== cartKey && cart[cartKey])
+        ? (Number(cart[cartKey].count) || 0)
+        : 0
+      const finalItem = {
+        ...nextItem,
+        count: modalDishCount + mergeCount
+      }
+      const keys = Object.keys(cart)
+      const editIndex = keys.indexOf(editingCartKey)
+      const skipKeys = new Set([editingCartKey])
+      if (editingCartKey !== cartKey && cart[cartKey]) {
+        skipKeys.add(cartKey)
+      }
+
+      const orderedCart = {}
+      let inserted = false
+      keys.forEach((key, index) => {
+        if (index === editIndex) {
+          orderedCart[cartKey] = finalItem
+          inserted = true
+          return
+        }
+        if (skipKeys.has(key)) {
+          return
+        }
+        orderedCart[key] = cart[key]
+      })
+      if (!inserted) {
+        orderedCart[cartKey] = finalItem
+      }
+      this.updateCart(orderedCart)
+    } else if (cart[cartKey]) {
+      cart[cartKey].count += modalDishCount
+      this.updateCart(cart)
+    } else {
+      cart[cartKey] = nextItem
+      this.updateCart(cart)
+    }
+
     this.closeTagModal()
+    if (editingCartKey) {
+      wx.showToast({ title: '已修改', icon: 'success', duration: 1000 })
+    }
   },
 
   // 生成购物车Key（包含标签信息）
@@ -791,7 +899,8 @@ Page({
       currentDish: null,
       selectedTags: {},
       modalDishCount: 1,
-      modalTotalPrice: 0
+      modalTotalPrice: 0,
+      editingCartKey: ''
     })
   },
 

@@ -116,11 +116,12 @@
           </view>
         </view>
         <view class="cart-goods-actions">
-          <view class="action-btn reduce" bindtap="reduceFromCart" data-id="{{index}}">
+          <view class="cart-edit-btn" catchtap="editCartItem" data-id="{{index}}">编辑</view>
+          <view class="action-btn reduce" catchtap="reduceFromCart" data-id="{{index}}">
             <text>-</text>
           </view>
           <view class="cart-count">{{item.count}}</view>
-          <view class="action-btn add" bindtap="addToCartFromCart" data-id="{{index}}">
+          <view class="action-btn add" catchtap="addToCartFromCart" data-id="{{index}}">
             <text>+</text>
           </view>
         </view>
@@ -231,7 +232,7 @@
           <text class="price-symbol">¥</text>
           <text class="price-num">{{modalTotalPrice}}</text>
         </view>
-        <view class="add-cart-btn" bindtap="confirmAddToCart">加入购物车</view>
+        <view class="add-cart-btn" bindtap="confirmAddToCart">{{editingCartKey ? '确认修改' : '加入购物车'}}</view>
       </view>
     </view>
   </view>
