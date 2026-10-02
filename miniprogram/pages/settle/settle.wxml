@@ -70,10 +70,7 @@
   </view>
 
   <view class="section">
-    <view class="section-title-wrapper">
-      <text class="section-title">订单明细</text>
-      <view class="edit-order-btn" bind:tap="editOrder">修改</view>
-    </view>
+    <view class="section-title">订单明细</view>
     <view class="goods-list">
       <view class="goods-item" wx:for="{{orderGoods}}" wx:key="index">
         <image class="goods-image" src="{{item.dishImage}}" mode="aspectFill"></image>
@@ -101,8 +98,9 @@
             <text>打包 +¥1/件</text>
           </view>
         </view>
-        <view class="goods-subtotal">
-          ¥{{item.subtotal}}
+        <view class="goods-right">
+          <view class="goods-edit-btn" catch:tap="openEditGoods" data-index="{{index}}">编辑</view>
+          <view class="goods-subtotal">¥{{item.subtotal}}</view>
         </view>
       </view>
 
@@ -123,6 +121,7 @@
   </view>
   </scroll-view>
 
+  <!-- 底部提交 -->
   <view class="footer">
     <view class="footer-price">
       <text class="footer-label">合计：</text>
@@ -133,6 +132,95 @@
       bind:tap="submitOrder">
       <text wx:if="{{submitting}}">提交中...</text>
       <text wx:else>提交并打印</text>
+    </view>
+  </view>
+
+  <!-- 规格编辑弹窗（与购物车编辑一致） -->
+  <view class="modal-mask" wx:if="{{showTagModal}}" catch:tap="closeTagModal">
+    <view class="modal-dialog dish-detail-modal" catch:tap="stopPropagation">
+      <view class="modal-close" bind:tap="closeTagModal">×</view>
+      <scroll-view class="modal-content" scroll-y>
+        <view class="dish-detail-header">
+          <image class="dish-detail-image" src="{{currentDish.imageUrl || currentDish.image}}" mode="aspectFill"></image>
+          <view class="dish-detail-info">
+            <view class="dish-detail-name">{{currentDish.name}}</view>
+            <view class="dish-detail-desc" wx:if="{{currentDish.description}}">{{currentDish.description}}</view>
+            <view class="dish-detail-price">
+              <text class="price-symbol">¥</text>
+              <text class="price-num">{{currentDish.price}}</text>
+            </view>
+          </view>
+        </view>
+
+        <block wx:for="{{currentDish.tags}}" wx:key="id" wx:for-item="tag">
+          <view class="tag-section">
+            <view class="tag-title">
+              {{tag.name}}
+              <text class="tag-type-label">{{tag.type === 'single' ? '(单选)' : '(多选)'}}</text>
+              <text class="tag-required-label" wx:if="{{tag.required}}">必选</text>
+            </view>
+
+            <view class="tag-options" wx:if="{{tag.type === 'single'}}">
+              <view
+                class="tag-option {{option.selected ? 'selected' : ''}}"
+                wx:for="{{tag.options}}"
+                wx:key="id"
+                wx:for-item="option"
+                bind:tap="selectTagOption"
+                data-tag-id="{{tag.id}}"
+                data-option-id="{{option.id || option.dishId}}">
+                <text>{{option.name}}</text>
+                <text class="tag-option-price" wx:if="{{option.price > 0}}">{{priceHelper.formatTagOptionPrice(option.price)}}</text>
+              </view>
+            </view>
+
+            <view class="tag-options" wx:if="{{tag.type === 'multiple'}}">
+              <view
+                wx:for="{{tag.options}}"
+                wx:key="id"
+                wx:for-item="option"
+                class="tag-option {{option.selectedCount > 0 ? 'selected' : ''}}">
+                <view
+                  class="tag-option-main"
+                  bind:tap="toggleTagOption"
+                  data-tag-id="{{tag.id}}"
+                  data-option-id="{{option.id || option.dishId}}">
+                  <text>{{option.name}}</text>
+                  <text class="tag-option-count" wx:if="{{option.selectedCount > 0}}">x{{option.selectedCount}}</text>
+                  <text class="tag-option-price" wx:if="{{option.price > 0}}">{{priceHelper.formatTagOptionPrice(option.price)}}</text>
+                </view>
+                <view
+                  class="tag-option-reduce"
+                  wx:if="{{option.selectedCount > 0}}"
+                  catch:tap="reduceTagOption"
+                  data-tag-id="{{tag.id}}"
+                  data-option-id="{{option.id || option.dishId}}">-</view>
+              </view>
+            </view>
+          </view>
+        </block>
+
+        <view class="quantity-section">
+          <view class="quantity-label">数量</view>
+          <view class="quantity-controls">
+            <view class="quantity-btn {{modalDishCount <= 1 ? 'disabled' : ''}}" bind:tap="decreaseModalCount">-</view>
+            <view class="quantity-num">{{modalDishCount}}</view>
+            <view class="quantity-btn" bind:tap="increaseModalCount">+</view>
+          </view>
+        </view>
+      </scroll-view>
+
+      <view class="modal-footer-bar">
+        <view class="footer-price">
+          <text class="total-label">小计：</text>
+          <text class="price-symbol">¥</text>
+          <text class="price-num">{{modalTotalPrice}}</text>
+        </view>
+        <view class="modal-footer-actions">
+          <view class="modal-delete-btn" bind:tap="removeEditGoods">删除</view>
+          <view class="add-cart-btn" bind:tap="confirmEditGoods">确认修改</view>
+        </view>
+      </view>
     </view>
   </view>
 </view>
