@@ -13,7 +13,8 @@ App({
         openidPromise: null, // 用于存储获取openid的Promise对象
         userInfo: null, // 用户信息
         userInfoReady: false,
-        userInfoPromise: null // 用于存储获取用户信息的Promise对象
+        userInfoPromise: null, // 用于存储获取用户信息的Promise对象
+        shouldClearCart: false
       }
 
       wx.cloud.init({

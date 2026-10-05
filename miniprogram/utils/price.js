@@ -18,6 +18,12 @@ function formatTagOptionPrice(price) {
   return formatted ? `+${formatted}元` : ''
 }
 
+function formatAbsOptionPrice(price) {
+  const num = Number(price)
+  if (!num || isNaN(num)) return ''
+  return Number.isInteger(num) ? `${num}元` : `${num.toFixed(2)}元`
+}
+
 function formatTagLabelSuffix(price) {
   const formatted = formatPrice(price)
   return formatted ? ` +${formatted}元` : ''
@@ -27,5 +33,6 @@ module.exports = {
   normalizePrice,
   formatPrice,
   formatTagOptionPrice,
+  formatAbsOptionPrice,
   formatTagLabelSuffix
 }

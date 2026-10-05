@@ -1,4 +1,5 @@
 const { formatTagLabelSuffix } = require('./price.js')
+const { isAbsorbedPriceTag, sumAbsorbedExtra } = require('./absorbPrice.js')
 
 const PACKAGING_FEE = 1
 const TABLE_OPTIONS = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6']
@@ -136,7 +137,8 @@ function buildTagsArrayFromCartItem(item) {
           const name = option.name || option
           const countText = count > 1 ? ` x${count}` : ''
           const totalExtra = (Number(option.price) || 0) * count
-          tagsArray.push(`${tag.name}: ${name}${countText}${formatTagLabelSuffix(totalExtra)}`)
+          const priceSuffix = isAbsorbedPriceTag(tag) ? '' : formatTagLabelSuffix(totalExtra)
+          tagsArray.push(`${tag.name}: ${name}${countText}${priceSuffix}`)
         }
       })
     })
@@ -156,6 +158,8 @@ function cartToOrderGoods(cart, packagingFeeCategories) {
     if (!item || !item.info || !item.count) continue
 
     const unitPrice = Number(item.unitPrice) || Number(item.info.price) || 0
+    const originPrice = Number(item.info.price) || 0
+    const basePrice = originPrice + sumAbsorbedExtra(item.info.tags || [], item.tags || {})
     goodsList.push({
       dishId: item.dishId || item.info._id,
       dishName: item.info.name,
@@ -163,8 +167,8 @@ function cartToOrderGoods(cart, packagingFeeCategories) {
       categoryName: item.info.categoryName || '',
       dishImage: item.info.imageUrl || item.info.image || '',
       price: unitPrice,
-      basePrice: Number(item.basePrice) || Number(item.info.price) || 0,
-      extraPrice: Number(item.extraPrice) || 0,
+      basePrice,
+      extraPrice: unitPrice - basePrice,
       count: item.count,
       tags: buildTagsArrayFromCartItem(item),
       selectedOptions: item.selectedOptions || [],

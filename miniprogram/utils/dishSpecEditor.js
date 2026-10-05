@@ -9,6 +9,7 @@ const {
   expandCategoryRefTag,
   collectCategoryIdsFromDishes
 } = require('./dishTags.js')
+const { isAbsorbedPriceTag, sumAbsorbedExtra } = require('./absorbPrice.js')
 
 const dishSpecEditor = {
   initDishSpecEditor() {
@@ -156,19 +157,26 @@ const dishSpecEditor = {
 
   updateTagOptionSelectedState(dish, selectedTags) {
     const nextDish = JSON.parse(JSON.stringify(dish || {}))
-    nextDish.tags = (nextDish.tags || []).map(tag => ({
-      ...tag,
-      options: (tag.options || []).map(option => {
-        const normalizedOption = this.normalizeTagOption(option)
-        const selectedValue = selectedTags[tag.id]
-        const selectedCount = this.getTagOptionCount(selectedValue, normalizedOption.id)
-        return {
-          ...normalizedOption,
-          selected: selectedCount > 0,
-          selectedCount
-        }
-      })
-    }))
+    const basePrice = Number(nextDish.price) || 0
+    nextDish.tags = (nextDish.tags || []).map(tag => {
+      const absorbPrice = isAbsorbedPriceTag(tag)
+      return {
+        ...tag,
+        absorbPrice,
+        options: (tag.options || []).map(option => {
+          const normalizedOption = this.normalizeTagOption(option)
+          const selectedValue = selectedTags[tag.id]
+          const selectedCount = this.getTagOptionCount(selectedValue, normalizedOption.id)
+          return {
+            ...normalizedOption,
+            selected: selectedCount > 0,
+            selectedCount,
+            displayPrice: absorbPrice ? basePrice + (Number(normalizedOption.price) || 0) : 0
+          }
+        })
+      }
+    })
+    nextDish.displayPrice = basePrice + sumAbsorbedExtra(nextDish.tags, selectedTags)
     return nextDish
   },
 
@@ -207,7 +215,8 @@ const dishSpecEditor = {
         if (option) {
           const countText = count > 1 ? ` x${count}` : ''
           const totalExtra = (Number(option.price) || 0) * count
-          labels.push(`${tag.name}: ${option.name}${countText}${formatTagLabelSuffix(totalExtra)}`)
+          const priceSuffix = isAbsorbedPriceTag(tag) ? '' : formatTagLabelSuffix(totalExtra)
+          labels.push(`${tag.name}: ${option.name}${countText}${priceSuffix}`)
         }
       })
     })
@@ -385,7 +394,8 @@ const dishSpecEditor = {
     const selectedOptions = this.getSelectedOptionList(currentDish, selectedTags)
     const tagLabels = this.buildTagLabels(currentDish, selectedTags)
     const unitPrice = this.calculateUnitPrice(currentDish, selectedTags)
-    const basePrice = Number(currentDish.price) || 0
+    const originPrice = Number(currentDish.price) || 0
+    const basePrice = originPrice + sumAbsorbedExtra(currentDish.tags, selectedTags)
     const count = Math.max(1, Number(modalDishCount) || 1)
     const prev = orderGoods[editIndex]
 

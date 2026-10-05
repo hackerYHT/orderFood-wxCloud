@@ -28,6 +28,17 @@ function formatTagOptionPrice(price) {
   return '+' + num.toFixed(2) + '元'
 }
 
+function formatAbsOptionPrice(price) {
+  var num = parseFloat(price)
+  if (isNaN(num) || num <= 0) {
+    return ''
+  }
+  if (num === parseInt(num, 10)) {
+    return num + '元'
+  }
+  return num.toFixed(2) + '元'
+}
+
 function formatTagLabelSuffix(price) {
   var num = normalizePrice(price)
   if (!num) {
@@ -40,6 +51,7 @@ module.exports = {
   normalizePrice: normalizePrice,
   formatPrice: formatPrice,
   formatTagOptionPrice: formatTagOptionPrice,
+  formatAbsOptionPrice: formatAbsOptionPrice,
   formatTagLabelSuffix: formatTagLabelSuffix
 }
 

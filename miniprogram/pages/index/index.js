@@ -4,10 +4,10 @@ const db = wx.cloud.database()
 const { formatTagLabelSuffix } = require('../../utils/price.js')
 const { resolveCloudImageUrls } = require('../../utils/cloudImage.js')
 const {
-  isCategoryRefTag,
   expandCategoryRefTag,
   collectCategoryIdsFromDishes
 } = require('../../utils/dishTags.js')
+const { isAbsorbedPriceTag, sumAbsorbedExtra } = require('../../utils/absorbPrice.js')
 const { cartToOrderGoods, orderGoodsToCart } = require('../../utils/orderGoods.js')
 
 Page({
@@ -80,7 +80,20 @@ Page({
 
   onShow() {
     this.loadUserInfo()
+    this.consumeClearCartFlag()
     this.checkEditOrderMode()
+  },
+
+  consumeClearCartFlag() {
+    const app = getApp()
+    const shouldClear = !!(wx.getStorageSync('shouldClearCart') || (app.globalData && app.globalData.shouldClearCart))
+    if (!shouldClear) return
+    wx.removeStorageSync('shouldClearCart')
+    wx.removeStorageSync('settleCartData')
+    if (app.globalData) {
+      app.globalData.shouldClearCart = false
+    }
+    this.clearCart()
   },
 
   checkEditOrderMode() {
@@ -270,14 +283,16 @@ Page({
       })
     } catch (err) {
       console.error('加载菜品失败', err)
-      if (showLoading) {
-        wx.showToast({ title: '加载失败', icon: 'none' })
-      }
+      this._goodsLoadFailed = true
     } finally {
       if (!append && showLoading) {
         wx.hideLoading()
       }
       this.setData({ goodsLoading: false })
+      if (this._goodsLoadFailed) {
+        this._goodsLoadFailed = false
+        wx.showToast({ title: '加载失败', icon: 'none' })
+      }
     }
   },
 
@@ -541,19 +556,26 @@ Page({
 
   updateTagOptionSelectedState(dish, selectedTags) {
     const nextDish = JSON.parse(JSON.stringify(dish || {}))
-    nextDish.tags = (nextDish.tags || []).map(tag => ({
-      ...tag,
-      options: (tag.options || []).map(option => {
-        const normalizedOption = this.normalizeTagOption(option)
-        const selectedValue = selectedTags[tag.id]
-        const selectedCount = this.getTagOptionCount(selectedValue, normalizedOption.id)
-        return {
-          ...normalizedOption,
-          selected: selectedCount > 0,
-          selectedCount
-        }
-      })
-    }))
+    const basePrice = Number(nextDish.price) || 0
+    nextDish.tags = (nextDish.tags || []).map(tag => {
+      const absorbPrice = isAbsorbedPriceTag(tag)
+      return {
+        ...tag,
+        absorbPrice,
+        options: (tag.options || []).map(option => {
+          const normalizedOption = this.normalizeTagOption(option)
+          const selectedValue = selectedTags[tag.id]
+          const selectedCount = this.getTagOptionCount(selectedValue, normalizedOption.id)
+          return {
+            ...normalizedOption,
+            selected: selectedCount > 0,
+            selectedCount,
+            displayPrice: absorbPrice ? basePrice + (Number(normalizedOption.price) || 0) : 0
+          }
+        })
+      }
+    })
+    nextDish.displayPrice = basePrice + sumAbsorbedExtra(nextDish.tags, selectedTags)
     return nextDish
   },
 
@@ -592,7 +614,8 @@ Page({
         if (option) {
           const countText = count > 1 ? ` x${count}` : ''
           const totalExtra = (Number(option.price) || 0) * count
-          labels.push(`${tag.name}: ${option.name}${countText}${formatTagLabelSuffix(totalExtra)}`)
+          const priceSuffix = isAbsorbedPriceTag(tag) ? '' : formatTagLabelSuffix(totalExtra)
+          labels.push(`${tag.name}: ${option.name}${countText}${priceSuffix}`)
         }
       })
     })
@@ -649,6 +672,8 @@ Page({
     const selectedOptions = this.getSelectedOptionList(currentDish, selectedTags)
     const tagLabels = this.buildTagLabels(currentDish, selectedTags)
     const unitPrice = this.calculateUnitPrice(currentDish, selectedTags)
+    const originPrice = Number(currentDish.price) || 0
+    const basePrice = originPrice + sumAbsorbedExtra(currentDish.tags, selectedTags)
     const nextItem = {
       info: currentDish,
       count: modalDishCount,
@@ -656,8 +681,8 @@ Page({
       selectedOptions,
       tagLabels,
       unitPrice,
-      basePrice: Number(currentDish.price) || 0,
-      extraPrice: unitPrice - (Number(currentDish.price) || 0),
+      basePrice,
+      extraPrice: unitPrice - basePrice,
       dishId: currentDish._id
     }
 

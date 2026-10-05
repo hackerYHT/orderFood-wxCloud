@@ -1,3 +1,9 @@
+const {
+  isAbsorbedPriceTag,
+  getAbsorbedOptionId,
+  sumAbsorbedExtra
+} = require('./absorbPrice.js')
+
 const CATEGORY_REF_SOURCE = 'categoryRef'
 
 function isCategoryRefTag(tag) {
@@ -254,6 +260,9 @@ function serializeTagsForStorage(tags = []) {
 module.exports = {
   CATEGORY_REF_SOURCE,
   isCategoryRefTag,
+  getOptionId: getAbsorbedOptionId,
+  isAbsorbedPriceTag,
+  sumAbsorbedExtra,
   buildCategoryRefTag,
   dishToTagOption,
   getOptionMatchKey,

@@ -158,7 +158,7 @@
             <view class="dish-detail-desc" wx:if="{{currentDish.description}}">{{currentDish.description}}</view>
             <view class="dish-detail-price">
               <text class="price-symbol">¥</text>
-              <text class="price-num">{{currentDish.price}}</text>
+              <text class="price-num">{{currentDish.displayPrice != null ? currentDish.displayPrice : currentDish.price}}</text>
             </view>
           </view>
         </view>
@@ -183,7 +183,8 @@
                 data-tag-id="{{tag.id}}"
                 data-option-id="{{option.id || option.dishId}}">
                 <text>{{option.name}}</text>
-                <text class="tag-option-price" wx:if="{{option.price > 0}}">{{priceHelper.formatTagOptionPrice(option.price)}}</text>
+                <text class="tag-option-price" wx:if="{{tag.absorbPrice && option.displayPrice > 0}}">{{priceHelper.formatAbsOptionPrice(option.displayPrice)}}</text>
+                <text class="tag-option-price" wx:elif="{{!tag.absorbPrice && option.price > 0}}">{{priceHelper.formatTagOptionPrice(option.price)}}</text>
               </view>
             </view>
 

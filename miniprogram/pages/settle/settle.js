@@ -1,6 +1,7 @@
 // pages/settle/settle.js
 const db = wx.cloud.database()
 const { formatTagLabelSuffix } = require('../../utils/price.js')
+const { isAbsorbedPriceTag, sumAbsorbedExtra } = require('../../utils/absorbPrice.js')
 const dishSpecEditor = require('../../utils/dishSpecEditor.js')
 const {
   TABLE_OPTIONS,
@@ -111,7 +112,8 @@ Page({
                 const name = option.name || option
                 const countText = count > 1 ? ` x${count}` : ''
                 const totalExtra = (Number(option.price) || 0) * count
-                tagsArray.push(`${tag.name}: ${name}${countText}${formatTagLabelSuffix(totalExtra)}`)
+                const priceSuffix = isAbsorbedPriceTag(tag) ? '' : formatTagLabelSuffix(totalExtra)
+                tagsArray.push(`${tag.name}: ${name}${countText}${priceSuffix}`)
               }
             })
           })
@@ -129,6 +131,8 @@ Page({
         }
 
         const unitPrice = Number(item.unitPrice) || Number(item.info.price) || 0
+        const originPrice = Number(item.info.price) || 0
+        const basePrice = originPrice + sumAbsorbedExtra(dishTags || [], selectedTags || {})
         if (item.info && item.info._id) {
           this.dishById[item.info._id] = item.info
         }
@@ -139,8 +143,8 @@ Page({
           categoryName: item.info.categoryName || '',
           dishImage: item.info.imageUrl || item.info.image || '',
           price: unitPrice,
-          basePrice: Number(item.basePrice) || Number(item.info.price) || 0,
-          extraPrice: Number(item.extraPrice) || 0,
+          basePrice,
+          extraPrice: unitPrice - basePrice,
           count: item.count,
           tags: tagsArray,
           selectedTags: JSON.parse(JSON.stringify(item.tags || {})),
@@ -281,7 +285,7 @@ Page({
         duration: 2500
       })
 
-      this.clearCart()
+      this.clearCartAfterPrint()
 
       setTimeout(() => {
         wx.switchTab({ url: '/pages/myorder/myorder' })
@@ -298,11 +302,21 @@ Page({
     }
   },
 
-  clearCart() {
-    const pages = getCurrentPages()
-    const indexPage = pages.find(page => page.route === 'pages/index/index')
-    if (indexPage) {
-      indexPage.updateCart({})
+  clearCartAfterPrint() {
+    wx.setStorageSync('shouldClearCart', true)
+    wx.removeStorageSync('settleCartData')
+    const app = getApp()
+    if (app.globalData) {
+      app.globalData.shouldClearCart = true
+    }
+
+    const pages = getCurrentPages() || []
+    const indexPage = pages.find(page => {
+      const route = (page && (page.route || page.__route__)) || ''
+      return route === 'pages/index/index' || route.endsWith('pages/index/index')
+    })
+    if (indexPage && typeof indexPage.clearCart === 'function') {
+      indexPage.clearCart()
     }
   }
 })

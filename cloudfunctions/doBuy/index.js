@@ -137,6 +137,46 @@ async function getNextQueueNumber() {
 
 const TAG_PRICE_SUFFIX = /\s\+(\d+(?:\.\d+)?)元$/
 
+function parsePrintTag(raw) {
+  const text = String(raw || '')
+  const priceMatch = text.match(TAG_PRICE_SUFFIX)
+  const tagPrice = priceMatch ? parseFloat(priceMatch[1]) : 0
+  const label = (priceMatch ? text.slice(0, priceMatch.index) : text).trim()
+  const name = label.split('：')[0].split(':')[0].trim()
+  const value = label.slice(name.length).replace(/^[:：]\s*/, '').trim()
+  return {
+    label,
+    name,
+    value,
+    tagPrice,
+    absorb: name === '份量' || name === '分量'
+  }
+}
+
+function buildDishPrintName(item, parsedTags) {
+  const packMark = item.needPackaging ? '[打包]' : ''
+  const baseName = item.dishName || item.goodsName || '未知菜品'
+  const portionValues = parsedTags
+    .filter(tag => tag.absorb && tag.value)
+    .map(tag => tag.value)
+  const portionSuffix = portionValues.length ? `（${portionValues.join('、')}）` : ''
+  return escapeHtml(`${packMark}${baseName}${portionSuffix}`)
+}
+
+function getDishPrintPrice(item, parsedTags) {
+  const absorbedExtra = parsedTags
+    .filter(tag => tag.absorb)
+    .reduce((sum, tag) => sum + (Number(tag.tagPrice) || 0), 0)
+  const toppingExtra = parsedTags
+    .filter(tag => !tag.absorb)
+    .reduce((sum, tag) => sum + (Number(tag.tagPrice) || 0), 0)
+  const unitPrice = Number(item.price) || 0
+  if (unitPrice > toppingExtra) {
+    return unitPrice - toppingExtra
+  }
+  return getItemBasePrice(item) + absorbedExtra
+}
+
 // 打印字体：菜品加高但不加宽，避免 58mm 纸一行装不下名称+数量+价格
 const FONT_DISH_HEIGHT = 2
 const FONT_DISH_WIDTH = 1
@@ -185,23 +225,19 @@ function generatePrintContent(order, ticketType = 'front') {
 
   if (order.goods && order.goods.length > 0) {
     order.goods.forEach(item => {
-      const packMark = item.needPackaging ? '[打包]' : ''
-      const dishName = escapeHtml(`${packMark}${item.dishName || item.goodsName || '未知菜品'}`)
       const count = item.count || 1
-      const basePrice = getItemBasePrice(item)
-      const rightPart = `×${count}  ￥${basePrice.toFixed(2)}`
+      const parsedTags = Array.isArray(item.tags) ? item.tags.map(parsePrintTag) : []
+      const dishName = buildDishPrintName(item, parsedTags)
+      const dishPrice = getDishPrintPrice(item, parsedTags)
+      const rightPart = `×${count}  ￥${dishPrice.toFixed(2)}`
       content += appendAlignedLine(dishName, rightPart, FONT_DISH_HEIGHT, FONT_DISH_WIDTH)
 
-      if (item.tags && Array.isArray(item.tags) && item.tags.length > 0) {
-        item.tags.forEach(tagStr => {
-          const raw = String(tagStr)
-          const priceMatch = raw.match(TAG_PRICE_SUFFIX)
-          const tagPrice = priceMatch ? parseFloat(priceMatch[1]) : 0
-          const tagLabel = escapeHtml(priceMatch ? raw.slice(0, priceMatch.index).trim() : raw)
-          const tagRight = tagPrice > 0 ? `  ￥${tagPrice.toFixed(2)}` : ''
-          content += appendAlignedLine(`  ${tagLabel}`, tagRight, FONT_TAG_HEIGHT, FONT_TAG_WIDTH)
-        })
-      }
+      parsedTags.forEach(tag => {
+        if (tag.absorb) return
+        const tagLabel = escapeHtml(tag.label)
+        const tagRight = tag.tagPrice > 0 ? `  ￥${tag.tagPrice.toFixed(2)}` : ''
+        content += appendAlignedLine(`  ${tagLabel}`, tagRight, FONT_TAG_HEIGHT, FONT_TAG_WIDTH)
+      })
     })
   }
 
