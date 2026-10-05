@@ -115,6 +115,13 @@
             </view>
             <view class="order-actions">
               <view
+                class="action-btn preview"
+                data-id="{{item._id}}"
+                catchtap="previewTicket"
+              >
+                预览小票
+              </view>
+              <view
                 class="action-btn edit"
                 data-id="{{item._id}}"
                 catchtap="goEditOrder"
@@ -149,4 +156,15 @@
 
     <van-empty wx:if="{{orderGroups.length === 0}}" description="暂无订单" />
   </scroll-view>
+
+  <view class="ticket-mask" wx:if="{{showTicketPreview}}" catchtap="closeTicketPreview">
+    <view class="ticket-sheet" catchtap="stopPropagation">
+      <view class="ticket-sheet-title">小票预览</view>
+      <view class="ticket-sheet-tip">仅预览，不会再次出纸</view>
+      <scroll-view class="ticket-sheet-body" scroll-y>
+        <text class="ticket-sheet-text" decode space="ensp">{{ticketPreviewText}}</text>
+      </scroll-view>
+      <view class="ticket-sheet-close" bindtap="closeTicketPreview">关闭</view>
+    </view>
+  </view>
 </view>

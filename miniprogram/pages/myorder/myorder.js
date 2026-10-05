@@ -71,7 +71,10 @@ Page({
     orderHasMore: true,
     loadingOrders: false,
     payFilter: 0, // 0: 全部, 1: 未支付, 2: 已支付
-    payFilterOptions: ['全部', '未支付', '已支付']
+    payFilterOptions: ['全部', '未支付', '已支付'],
+    showTicketPreview: false,
+    ticketPreviewText: '',
+    previewing: false
   },
 
   onLoad() {
@@ -232,6 +235,41 @@ Page({
     }, () => {
       this.loadOrders()
     })
+  },
+
+  stopPropagation() {},
+
+  closeTicketPreview() {
+    this.setData({ showTicketPreview: false })
+  },
+
+  async previewTicket(e) {
+    const orderId = e.currentTarget.dataset.id
+    if (!orderId || this.data.previewing) return
+    this.setData({ previewing: true })
+    wx.showLoading({ title: '生成预览...' })
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'doBuy',
+        data: {
+          previewOnly: true,
+          orderId
+        }
+      })
+      wx.hideLoading()
+      if (!res.result || !res.result.success) {
+        throw new Error((res.result && res.result.error) || '预览失败')
+      }
+      this.setData({
+        showTicketPreview: true,
+        ticketPreviewText: res.result.previewText || ''
+      })
+    } catch (err) {
+      wx.hideLoading()
+      wx.showToast({ title: err.message || '预览失败', icon: 'none' })
+    } finally {
+      this.setData({ previewing: false })
+    }
   },
 
   goEditOrder(e) {

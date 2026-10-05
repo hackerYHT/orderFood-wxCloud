@@ -128,6 +128,11 @@
       <text class="footer-price-num">¥{{priceHelper.formatPrice(finalPrice)}}</text>
     </view>
     <view
+      class="preview-btn {{previewing || !canSubmit ? 'disabled' : ''}}"
+      bind:tap="previewTicket">
+      预览小票
+    </view>
+    <view
       class="submit-btn {{submitting || !canSubmit ? 'disabled' : ''}}"
       bind:tap="submitOrder">
       <text wx:if="{{submitting}}">提交中...</text>
@@ -222,6 +227,17 @@
           <view class="add-cart-btn" bind:tap="confirmEditGoods">确认修改</view>
         </view>
       </view>
+    </view>
+  </view>
+
+  <view class="ticket-mask" wx:if="{{showTicketPreview}}" catch:tap="closeTicketPreview">
+    <view class="ticket-sheet" catch:tap="stopPropagation">
+      <view class="ticket-sheet-title">小票预览</view>
+      <view class="ticket-sheet-tip">仅预览，不会出纸、不会下单</view>
+      <scroll-view class="ticket-sheet-body" scroll-y>
+        <text class="ticket-sheet-text" decode space="ensp">{{ticketPreviewText}}</text>
+      </scroll-view>
+      <view class="ticket-sheet-close" bind:tap="closeTicketPreview">关闭</view>
     </view>
   </view>
 </view>

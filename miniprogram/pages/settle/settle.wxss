@@ -808,19 +808,39 @@
 }
 
 .submit-btn {
-  width: 240rpx;
-  min-width: 240rpx;
-  max-width: 240rpx;
+  width: 200rpx;
+  min-width: 200rpx;
+  max-width: 200rpx;
   height: 88rpx;
   line-height: 88rpx;
   border-radius: 44rpx;
-  font-size: 32rpx;
+  font-size: 30rpx;
   font-weight: 600;
   background-color: #e54d42;
   color: white;
   text-align: center;
   box-shadow: 0 4rpx 12rpx rgba(229, 77, 66, 0.3);
   transition: all 0.3s;
+}
+
+.preview-btn {
+  flex-shrink: 0;
+  height: 88rpx;
+  line-height: 88rpx;
+  padding: 0 24rpx;
+  border-radius: 44rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #e54d42;
+  background: #fff5f5;
+  border: 2rpx solid rgba(229, 77, 66, 0.35);
+  text-align: center;
+}
+
+.preview-btn.disabled {
+  color: #999;
+  background: #f5f5f5;
+  border-color: #eee;
 }
 
 .submit-btn:active {
@@ -838,6 +858,70 @@
 .submit-btn.disabled:active {
   opacity: 0.6;
   transform: none;
+}
+
+.ticket-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+  box-sizing: border-box;
+}
+
+.ticket-sheet {
+  width: 560rpx;
+  max-height: 82vh;
+  background: #fffdf7;
+  border-radius: 8rpx;
+  box-shadow: 0 12rpx 40rpx rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ticket-sheet-title {
+  text-align: center;
+  font-size: 30rpx;
+  font-weight: 700;
+  padding: 24rpx 24rpx 8rpx;
+}
+
+.ticket-sheet-tip {
+  text-align: center;
+  font-size: 22rpx;
+  color: #999;
+  padding-bottom: 16rpx;
+}
+
+.ticket-sheet-body {
+  height: 62vh;
+  padding: 0 28rpx 20rpx;
+  box-sizing: border-box;
+}
+
+.ticket-sheet-text {
+  display: block;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 22rpx;
+  line-height: 1.45;
+  color: #222;
+  white-space: pre;
+  word-break: break-all;
+}
+
+.ticket-sheet-close {
+  margin: 0 28rpx 28rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  text-align: center;
+  border-radius: 36rpx;
+  background: #333;
+  color: #fff;
+  font-size: 28rpx;
 }
 
 

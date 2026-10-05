@@ -29,6 +29,9 @@ Page({
     payStatus: false,
     submitting: false,
     canSubmit: false,
+    showTicketPreview: false,
+    ticketPreviewText: '',
+    previewing: false,
     showTagModal: false,
     editIndex: -1,
     currentDish: null,
@@ -220,6 +223,46 @@ Page({
 
   updateCanSubmit() {
     this.setData({ canSubmit: this.data.orderGoods.length > 0 })
+  },
+
+  closeTicketPreview() {
+    this.setData({ showTicketPreview: false })
+  },
+
+  async previewTicket() {
+    if (!this.data.canSubmit || this.data.previewing) return
+    this.setData({ previewing: true })
+    wx.showLoading({ title: '生成预览...' })
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'doBuy',
+        data: {
+          previewOnly: true,
+          orderGoods: this.data.orderGoods,
+          totalPrice: this.data.totalPrice,
+          finalPrice: this.data.finalPrice,
+          packagingFee: this.data.packagingFee,
+          packagingFeeItemCount: this.data.packagingFeeItemCount,
+          tableNumber: this.data.tableNumber,
+          orderType: this.data.orderType,
+          remark: this.data.remark,
+          pay_status: this.data.payStatus
+        }
+      })
+      wx.hideLoading()
+      if (!res.result || !res.result.success) {
+        throw new Error((res.result && res.result.error) || '预览失败')
+      }
+      this.setData({
+        showTicketPreview: true,
+        ticketPreviewText: res.result.previewText || ''
+      })
+    } catch (err) {
+      wx.hideLoading()
+      wx.showToast({ title: err.message || '预览失败', icon: 'none' })
+    } finally {
+      this.setData({ previewing: false })
+    }
   },
 
   async submitOrder() {

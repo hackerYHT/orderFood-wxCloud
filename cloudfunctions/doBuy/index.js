@@ -153,14 +153,101 @@ function parsePrintTag(raw) {
   }
 }
 
-function buildDishPrintName(item, parsedTags) {
-  const packMark = item.needPackaging ? '[打包]' : ''
-  const baseName = item.dishName || item.goodsName || '未知菜品'
+function sliceByPrintWidth(text, maxWidth) {
+  const value = String(text || '')
+  if (maxWidth <= 0) return { head: '', rest: value }
+  if (getStringWidth(value) <= maxWidth) return { head: value, rest: '' }
+  let width = 0
+  let cut = 0
+  for (let i = 0; i < value.length; i++) {
+    const charWidth = getStringWidth(value.charAt(i))
+    if (width + charWidth > maxWidth) break
+    width += charWidth
+    cut = i + 1
+  }
+  if (cut <= 0) return { head: value.charAt(0), rest: value.slice(1) }
+  return { head: value.slice(0, cut), rest: value.slice(cut) }
+}
+
+function getPortionSuffix(parsedTags) {
   const portionValues = parsedTags
     .filter(tag => tag.absorb && tag.value)
-    .map(tag => tag.value)
-  const portionSuffix = portionValues.length ? `（${portionValues.join('、')}）` : ''
-  return escapeHtml(`${packMark}${baseName}${portionSuffix}`)
+    .map(tag => {
+      const value = String(tag.value).replace(/碗/g, '').trim()
+      const short = value.charAt(0) || String(tag.value).charAt(0)
+      return short ? `[${short}]` : ''
+    })
+    .filter(Boolean)
+  return portionValues.join('')
+}
+
+function getPrintLineWidth(fontWidth) {
+  return Math.floor(PAPER_COLS / (fontWidth || 1))
+}
+
+function oneAlignedLine(leftText, rightPart, fontHeight, fontWidth) {
+  const totalWidth = getPrintLineWidth(fontWidth)
+  const spacesNeeded = totalWidth - getStringWidth(leftText) - getStringWidth(rightPart || '')
+  const spaces = spacesNeeded > 0 ? generateSpaces(spacesNeeded) : ''
+  return `<LEFT><font# bolder=0 height=${fontHeight} width=${fontWidth}>${leftText}${spaces}${rightPart || ''}</font#></LEFT><BR>`
+}
+
+function appendAlignedLine(leftText, rightPart, fontHeight = 1, fontWidth = fontHeight) {
+  const totalWidth = getPrintLineWidth(fontWidth)
+  const rightWidth = getStringWidth(rightPart || '')
+  const maxLeftWidth = Math.max(2, totalWidth - rightWidth - 1)
+  let remaining = leftText
+  let html = ''
+  let first = true
+
+  while (first || remaining) {
+    const limit = first ? maxLeftWidth : totalWidth
+    const { head, rest } = sliceByPrintWidth(remaining, limit)
+    html += oneAlignedLine(head, first ? (rightPart || '') : '', fontHeight, fontWidth)
+    remaining = rest
+    first = false
+    if (!remaining) break
+  }
+  return html
+}
+
+function fontSpan(text, { bold = false, height = 1, width = 1 } = {}) {
+  if (!text) return ''
+  return `<font# bolder=${bold ? 1 : 0} height=${height} width=${width}>${text}</font#>`
+}
+
+function oneDishLine(baseName, portion, rightPart) {
+  const totalWidth = getPrintLineWidth(FONT_DISH_WIDTH)
+  const leftWidth = getStringWidth(`${baseName}${portion || ''}`)
+  const rightWidth = getStringWidth(rightPart || '')
+  const spacesNeeded = totalWidth - leftWidth - rightWidth
+  const spaces = spacesNeeded > 0 ? generateSpaces(spacesNeeded) : ''
+  const h = FONT_DISH_HEIGHT
+  const w = FONT_DISH_WIDTH
+  return `<LEFT>${fontSpan(baseName, { height: h, width: w })}${fontSpan(portion, { bold: true, height: h, width: w })}${fontSpan(`${spaces}${rightPart || ''}`, { height: h, width: w })}</LEFT><BR>`
+}
+
+function appendDishBlock(item, parsedTags, rightPart) {
+  const packMark = item.needPackaging ? '[打包]' : ''
+  const baseName = escapeHtml(`${packMark}${item.dishName || item.goodsName || '未知菜品'}`)
+  const portion = escapeHtml(getPortionSuffix(parsedTags))
+  const combined = `${baseName}${portion}`
+  const totalWidth = getPrintLineWidth(FONT_DISH_WIDTH)
+  const leftWidth = getStringWidth(combined)
+  const rightWidth = getStringWidth(rightPart || '')
+
+  if (leftWidth + rightWidth <= totalWidth) {
+    return oneDishLine(baseName, portion, rightPart)
+  }
+
+  let html = ''
+  if (leftWidth <= totalWidth) {
+    html += oneDishLine(baseName, portion, '')
+  } else {
+    html += appendAlignedLine(combined, '', FONT_DISH_HEIGHT, FONT_DISH_WIDTH)
+  }
+  html += oneAlignedLine('', rightPart, FONT_DISH_HEIGHT, FONT_DISH_WIDTH)
+  return html
 }
 
 function getDishPrintPrice(item, parsedTags) {
@@ -177,11 +264,11 @@ function getDishPrintPrice(item, parsedTags) {
   return getItemBasePrice(item) + absorbedExtra
 }
 
-// 打印字体：菜品加高但不加宽，避免 58mm 纸一行装不下名称+数量+价格
 const FONT_DISH_HEIGHT = 2
 const FONT_DISH_WIDTH = 1
 const FONT_TAG_HEIGHT = 2
 const FONT_TAG_WIDTH = 1
+const PAPER_COLS = 32
 
 const getItemBasePrice = (item) => {
   if (item.basePrice != null && item.basePrice !== '') {
@@ -190,16 +277,6 @@ const getItemBasePrice = (item) => {
   const unitPrice = Number(item.price) || 0
   const extraPrice = Number(item.extraPrice) || 0
   return extraPrice > 0 ? Math.max(0, unitPrice - extraPrice) : unitPrice
-}
-
-const appendAlignedLine = (leftText, rightPart, fontHeight = 1, fontWidth = fontHeight) => {
-  const leftWidth = getStringWidth(leftText)
-  const rightWidth = getStringWidth(rightPart)
-  // 58mm 纸约 32 半角；font width 放大后可用列宽需折算
-  const totalWidth = Math.floor(31 / fontWidth)
-  const spacesNeeded = totalWidth - leftWidth - rightWidth
-  const spaces = spacesNeeded > 0 ? generateSpaces(spacesNeeded) : ' '
-  return `<LEFT><font# bolder=0 height=${fontHeight} width=${fontWidth}>${leftText}${spaces}${rightPart}</font#></LEFT><BR>`
 }
 
 // ticketType: 'front' 前台（含价格） | 'kitchen' 后厨（无价格）
@@ -224,20 +301,23 @@ function generatePrintContent(order, ticketType = 'front') {
   content += `<C>--------------商品--------------</C><BR>`
 
   if (order.goods && order.goods.length > 0) {
-    order.goods.forEach(item => {
+    order.goods.forEach((item, index) => {
       const count = item.count || 1
       const parsedTags = Array.isArray(item.tags) ? item.tags.map(parsePrintTag) : []
-      const dishName = buildDishPrintName(item, parsedTags)
       const dishPrice = getDishPrintPrice(item, parsedTags)
-      const rightPart = `×${count}  ￥${dishPrice.toFixed(2)}`
-      content += appendAlignedLine(dishName, rightPart, FONT_DISH_HEIGHT, FONT_DISH_WIDTH)
+      const rightPart = `x${count} ￥${dishPrice.toFixed(2)}`
+      content += appendDishBlock(item, parsedTags, rightPart)
 
       parsedTags.forEach(tag => {
         if (tag.absorb) return
         const tagLabel = escapeHtml(tag.label)
-        const tagRight = tag.tagPrice > 0 ? `  ￥${tag.tagPrice.toFixed(2)}` : ''
+        const tagRight = tag.tagPrice > 0 ? ` ￥${tag.tagPrice.toFixed(2)}` : ''
         content += appendAlignedLine(`  ${tagLabel}`, tagRight, FONT_TAG_HEIGHT, FONT_TAG_WIDTH)
       })
+
+      if (index < order.goods.length - 1) {
+        content += `<BR>`
+      }
     })
   }
 
@@ -295,6 +375,15 @@ async function callPayInVoice(printer, { text, outTradeNo }) {
       outTradeNo
     }
   })
+}
+
+function markupToPreviewText(content) {
+  return String(content || '')
+    .replace(/<BR\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .trim()
 }
 
 async function printOrder(orderId, orderData) {
@@ -361,6 +450,8 @@ exports.main = async (event, context) => {
   const openid = wxContext.OPENID
 
   const {
+    previewOnly,
+    orderId: previewOrderId,
     orderGoods,
     totalPrice,
     finalPrice: clientFinalPrice,
@@ -373,6 +464,46 @@ exports.main = async (event, context) => {
   } = event
 
   try {
+    if (previewOnly) {
+      if (previewOrderId) {
+        const existRes = await db.collection('order').doc(previewOrderId).get()
+        if (!existRes.data) {
+          return { success: false, error: '订单不存在' }
+        }
+        return {
+          success: true,
+          previewText: markupToPreviewText(generatePrintContent(existRes.data, 'front'))
+        }
+      }
+
+      const finalOrderType = orderType || (tableNumber ? 'dineIn' : 'takeOut')
+      const orderTotal = Number(totalPrice) || 0
+      const categoryIds = await loadPackagingFeeCategoryIds()
+      const normalizedGoods = normalizeOrderGoods(orderGoods, categoryIds)
+      const calculated = calcPackagingFeeFromGoods(normalizedGoods)
+      const packagingFee = calculated.packagingFee
+      const packagingFeeItemCount = calculated.packagingFeeItemCount
+      const orderFinal = orderTotal + packagingFee
+      const previewOrder = {
+        type: 'order',
+        goods: normalizedGoods,
+        totalPrice: orderTotal,
+        packagingFee,
+        packagingFeeItemCount,
+        finalPrice: orderFinal,
+        orderType: finalOrderType,
+        pay_status: pay_status === true,
+        remark: remark || '',
+        createTime: new Date(),
+        tableNumber: tableNumber || '',
+        queueNumber: '000'
+      }
+      return {
+        success: true,
+        previewText: markupToPreviewText(generatePrintContent(previewOrder, 'front'))
+      }
+    }
+
     const finalOrderType = orderType || (tableNumber ? 'dineIn' : 'takeOut')
     const date = new Date()
     const orderTotal = Number(totalPrice) || 0
