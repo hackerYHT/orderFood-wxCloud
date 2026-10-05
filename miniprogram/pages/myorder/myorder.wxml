@@ -18,7 +18,14 @@
     </view>
   </view>
 
-  <view class="order-list">
+  <scroll-view
+    class="order-list"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    lower-threshold="120"
+    bindscrolltolower="onReachBottom"
+  >
     <view class="date-group" wx:for="{{orderGroups}}" wx:key="dateKey" wx:for-item="group">
       <view
         class="date-header {{group.isToday ? 'today' : ''}} {{group.expanded ? 'expanded' : ''}}"
@@ -41,6 +48,7 @@
               <text wx:if="{{item.orderType === 'dineIn'}}">🍽️ 堂食订单</text>
               <text wx:elif="{{item.orderType === 'takeOut'}}">📦 打包订单</text>
               <text wx:else>🍽️ 点餐订单</text>
+              <text class="order-time-badge" wx:if="{{item.createTimeClock}}">{{item.createTimeClock}}</text>
             </view>
             <view class="order-status-row">
               <view class="pay-status {{item.pay_status ? 'paid' : 'unpaid'}}">
@@ -102,9 +110,8 @@
           </view>
 
           <view class="order-footer">
-            <view class="order-info">
-              <view class="order-time">{{item.createTimeText}}</view>
-              <view class="order-table-code" wx:if="{{item.tableNumber}}">桌号：{{item.tableNumber}}</view>
+            <view class="order-info" wx:if="{{item.tableNumber}}">
+              <view class="order-table-code">桌号：{{item.tableNumber}}</view>
             </view>
             <view class="order-actions">
               <view
@@ -141,5 +148,5 @@
     </view>
 
     <van-empty wx:if="{{orderGroups.length === 0}}" description="暂无订单" />
-  </view>
+  </scroll-view>
 </view>

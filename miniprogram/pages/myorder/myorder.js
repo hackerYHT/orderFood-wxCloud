@@ -46,6 +46,12 @@ function formatTime(time) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+function formatClockTime(time) {
+  const date = toDate(time)
+  if (!date || Number.isNaN(date.getTime())) return ''
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 function enrichServeStatus(order) {
   const goods = Array.isArray(order.goods) ? order.goods : []
   const servedCount = goods.filter(item => item && item.served === true).length
@@ -169,7 +175,8 @@ Page({
         return {
           ...order,
           dateKey,
-          createTimeText: order.createTime ? formatTime(order.createTime) : ''
+          createTimeText: order.createTime ? formatTime(order.createTime) : '',
+          createTimeClock: order.createTime ? formatClockTime(order.createTime) : ''
         }
       })
 
