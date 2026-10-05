@@ -169,18 +169,6 @@ function sliceByPrintWidth(text, maxWidth) {
   return { head: value.slice(0, cut), rest: value.slice(cut) }
 }
 
-function getPortionSuffix(parsedTags) {
-  const portionValues = parsedTags
-    .filter(tag => tag.absorb && tag.value)
-    .map(tag => {
-      const value = String(tag.value).replace(/碗/g, '').trim()
-      const short = value.charAt(0) || String(tag.value).charAt(0)
-      return short ? `[${short}]` : ''
-    })
-    .filter(Boolean)
-  return portionValues.join('')
-}
-
 function getPrintLineWidth(fontWidth) {
   return Math.floor(PAPER_COLS / (fontWidth || 1))
 }
@@ -211,43 +199,10 @@ function appendAlignedLine(leftText, rightPart, fontHeight = 1, fontWidth = font
   return html
 }
 
-function fontSpan(text, { bold = false, height = 1, width = 1 } = {}) {
-  if (!text) return ''
-  return `<font# bolder=${bold ? 1 : 0} height=${height} width=${width}>${text}</font#>`
-}
-
-function oneDishLine(baseName, portion, rightPart) {
-  const totalWidth = getPrintLineWidth(FONT_DISH_WIDTH)
-  const leftWidth = getStringWidth(`${baseName}${portion || ''}`)
-  const rightWidth = getStringWidth(rightPart || '')
-  const spacesNeeded = totalWidth - leftWidth - rightWidth
-  const spaces = spacesNeeded > 0 ? generateSpaces(spacesNeeded) : ''
-  const h = FONT_DISH_HEIGHT
-  const w = FONT_DISH_WIDTH
-  return `<LEFT>${fontSpan(baseName, { height: h, width: w })}${fontSpan(portion, { bold: true, height: h, width: w })}${fontSpan(`${spaces}${rightPart || ''}`, { height: h, width: w })}</LEFT><BR>`
-}
-
-function appendDishBlock(item, parsedTags, rightPart) {
+function appendDishBlock(item, rightPart) {
   const packMark = item.needPackaging ? '[打包]' : ''
   const baseName = escapeHtml(`${packMark}${item.dishName || item.goodsName || '未知菜品'}`)
-  const portion = escapeHtml(getPortionSuffix(parsedTags))
-  const combined = `${baseName}${portion}`
-  const totalWidth = getPrintLineWidth(FONT_DISH_WIDTH)
-  const leftWidth = getStringWidth(combined)
-  const rightWidth = getStringWidth(rightPart || '')
-
-  if (leftWidth + rightWidth <= totalWidth) {
-    return oneDishLine(baseName, portion, rightPart)
-  }
-
-  let html = ''
-  if (leftWidth <= totalWidth) {
-    html += oneDishLine(baseName, portion, '')
-  } else {
-    html += appendAlignedLine(combined, '', FONT_DISH_HEIGHT, FONT_DISH_WIDTH)
-  }
-  html += oneAlignedLine('', rightPart, FONT_DISH_HEIGHT, FONT_DISH_WIDTH)
-  return html
+  return appendAlignedLine(baseName, rightPart, FONT_DISH_HEIGHT, FONT_DISH_WIDTH)
 }
 
 function getDishPrintPrice(item, parsedTags) {
@@ -306,12 +261,11 @@ function generatePrintContent(order, ticketType = 'front') {
       const parsedTags = Array.isArray(item.tags) ? item.tags.map(parsePrintTag) : []
       const dishPrice = getDishPrintPrice(item, parsedTags)
       const rightPart = `x${count} ￥${dishPrice.toFixed(2)}`
-      content += appendDishBlock(item, parsedTags, rightPart)
+      content += appendDishBlock(item, rightPart)
 
       parsedTags.forEach(tag => {
-        if (tag.absorb) return
         const tagLabel = escapeHtml(tag.label)
-        const tagRight = tag.tagPrice > 0 ? ` ￥${tag.tagPrice.toFixed(2)}` : ''
+        const tagRight = (!tag.absorb && tag.tagPrice > 0) ? ` ￥${tag.tagPrice.toFixed(2)}` : ''
         content += appendAlignedLine(`  ${tagLabel}`, tagRight, FONT_TAG_HEIGHT, FONT_TAG_WIDTH)
       })
 
