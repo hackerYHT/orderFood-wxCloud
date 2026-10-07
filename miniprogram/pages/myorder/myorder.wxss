@@ -132,6 +132,53 @@
   margin-bottom: 20rpx;
 }
 
+.load-more {
+  text-align: center;
+  padding: 28rpx 20rpx 48rpx;
+  font-size: 26rpx;
+  color: #e54d42;
+}
+
+.load-more.done {
+  color: #999;
+}
+
+.day-loading,
+.day-empty {
+  text-align: center;
+  padding: 28rpx 16rpx;
+  font-size: 24rpx;
+  color: #999;
+}
+
+.empty-wrap {
+  padding: 120rpx 0;
+  text-align: center;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #999;
+}
+
+.load-error {
+  margin: 20rpx;
+  padding: 24rpx;
+  background: #fff5f5;
+  border: 1rpx solid rgba(229, 77, 66, 0.2);
+  border-radius: 12rpx;
+  color: #e54d42;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.load-error-retry {
+  display: block;
+  margin-top: 12rpx;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 .date-header {
   position: sticky;
   top: 0;
