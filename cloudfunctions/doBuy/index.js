@@ -340,7 +340,7 @@ function markupToPreviewText(content) {
     .trim()
 }
 
-async function printOrder(orderId, orderData) {
+async function printOrder(orderId, orderData, { outTradeSuffix = '' } = {}) {
   try {
     const printerRes = await db.collection('printer').limit(1).get()
     if (!printerRes.data || printerRes.data.length === 0) {
@@ -349,6 +349,7 @@ async function printOrder(orderId, orderData) {
     }
 
     const printer = printerRes.data[0]
+    const tradeSuffix = outTradeSuffix || ''
 
     const kitchenContent = generatePrintContent(orderData, 'kitchen')
     const frontContent = generatePrintContent(orderData, 'front')
@@ -356,12 +357,12 @@ async function printOrder(orderId, orderData) {
     const [kitchenRes, frontRes] = await Promise.all([
       callPrintNote(printer, {
         content: kitchenContent,
-        outTradeNo: `${orderId}_kitchen`,
+        outTradeNo: `${orderId}_kitchen${tradeSuffix}`,
         voice: buildOrderTypeVoice(orderData.orderType)
       }),
       callPrintNote(printer, {
         content: frontContent,
-        outTradeNo: `${orderId}_front`
+        outTradeNo: `${orderId}_front${tradeSuffix}`
       })
     ])
 
@@ -372,7 +373,7 @@ async function printOrder(orderId, orderData) {
       try {
         const voiceRes = await callPayInVoice(printer, {
           text: buildPayInVoiceText(orderData.finalPrice),
-          outTradeNo: `${orderId}_voice`
+          outTradeNo: `${orderId}_voice${tradeSuffix}`
         })
         if (!(voiceRes.result && voiceRes.result.success)) {
           console.warn('合计金额语音播报失败', voiceRes.result)
@@ -405,6 +406,7 @@ exports.main = async (event, context) => {
 
   const {
     previewOnly,
+    printOnly,
     skipPrint,
     orderId: previewOrderId,
     orderGoods,
@@ -419,6 +421,34 @@ exports.main = async (event, context) => {
   } = event
 
   try {
+    // 已有订单：仅打印（可重复出纸）
+    if (printOnly) {
+      const orderId = previewOrderId || event.orderId
+      if (!orderId) {
+        return { success: false, error: '缺少订单ID' }
+      }
+      const existRes = await db.collection('order').doc(orderId).get()
+      if (!existRes.data) {
+        return { success: false, error: '订单不存在' }
+      }
+      const printResult = await printOrder(orderId, existRes.data, {
+        outTradeSuffix: `_r${Date.now()}`
+      })
+      return {
+        success: !!printResult.printed,
+        orderId,
+        queueNumber: existRes.data.queueNumber || '',
+        printed: !!printResult.printed,
+        printReason: printResult.reason || '',
+        printError: printResult.printError || '',
+        error: printResult.printed
+          ? ''
+          : (printResult.reason === 'no_printer'
+            ? '未绑定打印机'
+            : (printResult.printError || '打印失败'))
+      }
+    }
+
     if (previewOnly) {
       if (previewOrderId) {
         const existRes = await db.collection('order').doc(previewOrderId).get()

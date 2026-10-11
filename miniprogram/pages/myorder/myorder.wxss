@@ -711,13 +711,34 @@
   word-break: break-all;
 }
 
-.ticket-sheet-close {
+.ticket-sheet-actions {
+  display: flex;
+  gap: 16rpx;
   margin: 0 28rpx 28rpx;
+}
+
+.ticket-sheet-close,
+.ticket-sheet-print {
+  flex: 1;
   height: 72rpx;
   line-height: 72rpx;
   text-align: center;
   border-radius: 36rpx;
+  font-size: 26rpx;
+}
+
+.ticket-sheet-close {
   background: #333;
   color: #fff;
-  font-size: 28rpx;
+}
+
+.ticket-sheet-print {
+  background: #e54d42;
+  color: #fff;
+  font-weight: 600;
+}
+
+.ticket-sheet-print.disabled {
+  opacity: 0.55;
+  pointer-events: none;
 }

@@ -176,11 +176,20 @@
   <view class="ticket-mask" wx:if="{{showTicketPreview}}" catchtap="closeTicketPreview">
     <view class="ticket-sheet" catchtap="stopPropagation">
       <view class="ticket-sheet-title">小票预览</view>
-      <view class="ticket-sheet-tip">仅预览，不会再次出纸</view>
+      <view class="ticket-sheet-tip">确认无误后可打印出纸</view>
       <scroll-view class="ticket-sheet-body" scroll-y>
         <text class="ticket-sheet-text" decode space="ensp">{{ticketPreviewText}}</text>
       </scroll-view>
-      <view class="ticket-sheet-close" bindtap="closeTicketPreview">关闭</view>
+      <view class="ticket-sheet-actions">
+        <view class="ticket-sheet-close" bindtap="closeTicketPreview">关闭</view>
+        <view
+          class="ticket-sheet-print {{printingTicket ? 'disabled' : ''}}"
+          bindtap="printPreviewTicket"
+        >
+          <text wx:if="{{printingTicket}}">打印中...</text>
+          <text wx:else>打印小票</text>
+        </view>
+      </view>
     </view>
   </view>
 </view>

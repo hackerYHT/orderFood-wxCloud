@@ -83,7 +83,9 @@ Page({
     payFilterOptions: ['全部', '未支付', '已支付'],
     showTicketPreview: false,
     ticketPreviewText: '',
-    previewing: false
+    previewOrderId: '',
+    previewing: false,
+    printingTicket: false
   },
 
   onLoad() {
@@ -598,7 +600,10 @@ Page({
   stopPropagation() {},
 
   closeTicketPreview() {
-    this.setData({ showTicketPreview: false })
+    this.setData({
+      showTicketPreview: false,
+      previewOrderId: ''
+    })
   },
 
   async previewTicket(e) {
@@ -620,6 +625,7 @@ Page({
       }
       this.setData({
         showTicketPreview: true,
+        previewOrderId: orderId,
         ticketPreviewText: res.result.previewText || ''
       })
     } catch (err) {
@@ -627,6 +633,34 @@ Page({
       wx.showToast({ title: err.message || '预览失败', icon: 'none' })
     } finally {
       this.setData({ previewing: false })
+    }
+  },
+
+  async printPreviewTicket() {
+    const orderId = this.data.previewOrderId
+    if (!orderId || this.data.printingTicket) return
+
+    this.setData({ printingTicket: true })
+    wx.showLoading({ title: '打印中...' })
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'doBuy',
+        data: {
+          printOnly: true,
+          orderId
+        }
+      })
+      wx.hideLoading()
+      if (!res.result || !res.result.success) {
+        throw new Error((res.result && res.result.error) || '打印失败')
+      }
+      this.setData({ showTicketPreview: false, previewOrderId: '' })
+      wx.showToast({ title: '已发送打印', icon: 'success' })
+    } catch (err) {
+      wx.hideLoading()
+      wx.showToast({ title: err.message || '打印失败', icon: 'none' })
+    } finally {
+      this.setData({ printingTicket: false })
     }
   },
 
