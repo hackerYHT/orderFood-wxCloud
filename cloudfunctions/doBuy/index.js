@@ -405,6 +405,7 @@ exports.main = async (event, context) => {
 
   const {
     previewOnly,
+    skipPrint,
     orderId: previewOrderId,
     orderGoods,
     totalPrice,
@@ -515,7 +516,18 @@ exports.main = async (event, context) => {
       createTime: date
     }
 
-    // 打印走后台，不阻塞下单响应（避免 printManage 串行调用导致超时）
+    // 仅生成订单时跳过打印；否则打印走后台，不阻塞下单响应
+    if (skipPrint) {
+      return {
+        success: true,
+        orderId,
+        queueNumber,
+        printed: false,
+        printPending: false,
+        printReason: 'skipped'
+      }
+    }
+
     printOrder(orderId, orderWithId).catch(err => {
       console.error('后台打印订单失败', err)
     })

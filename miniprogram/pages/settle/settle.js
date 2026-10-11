@@ -265,7 +265,15 @@ Page({
     }
   },
 
-  async submitOrder() {
+  submitOrder() {
+    return this.submitOrderInternal({ skipPrint: false })
+  },
+
+  submitOrderOnly() {
+    return this.submitOrderInternal({ skipPrint: true })
+  },
+
+  async submitOrderInternal({ skipPrint = false } = {}) {
     if (!this.data.canSubmit || this.data.submitting) {
       return
     }
@@ -282,13 +290,14 @@ Page({
       return
     }
 
-    this.setData({ submitting: true })
-    wx.showLoading({ title: '提交并打印中...' })
+    this.setData({ submitting: true, showTicketPreview: false })
+    wx.showLoading({ title: skipPrint ? '生成订单中...' : '提交并打印中...' })
 
     try {
       const doBuyRes = await wx.cloud.callFunction({
         name: 'doBuy',
         data: {
+          skipPrint: !!skipPrint,
           orderGoods: this.data.orderGoods,
           totalPrice: this.data.totalPrice,
           finalPrice: this.data.finalPrice,
@@ -308,23 +317,28 @@ Page({
       wx.hideLoading()
 
       const { printed, printReason, printError, queueNumber, printPending } = doBuyRes.result
-      let toastTitle = queueNumber ? `取餐号 #${queueNumber}` : '已提交并打印'
-      if (printPending) {
-        toastTitle = queueNumber ? `取餐号 #${queueNumber}` : '已提交'
-      } else if (!printed) {
-        const reasonTitles = {
-          no_printer: queueNumber ? `取餐号 #${queueNumber}（未绑定打印机）` : '已提交（未绑定打印机）',
-          print_failed: queueNumber ? `取餐号 #${queueNumber}（打印失败）` : '已提交（打印失败）',
-          print_error: queueNumber ? `取餐号 #${queueNumber}（打印异常）` : '已提交（打印异常）'
-        }
-        toastTitle = reasonTitles[printReason] || (queueNumber ? `取餐号 #${queueNumber}（打印未成功）` : '已提交（打印未成功）')
-        if (printError && printReason === 'print_failed') {
-          console.warn('打印失败详情:', printError)
+      let toastTitle
+      if (skipPrint) {
+        toastTitle = queueNumber ? `已生成 #${queueNumber}` : '订单已生成'
+      } else {
+        toastTitle = queueNumber ? `取餐号 #${queueNumber}` : '已提交并打印'
+        if (printPending) {
+          toastTitle = queueNumber ? `取餐号 #${queueNumber}` : '已提交'
+        } else if (!printed) {
+          const reasonTitles = {
+            no_printer: queueNumber ? `取餐号 #${queueNumber}（未绑定打印机）` : '已提交（未绑定打印机）',
+            print_failed: queueNumber ? `取餐号 #${queueNumber}（打印失败）` : '已提交（打印失败）',
+            print_error: queueNumber ? `取餐号 #${queueNumber}（打印异常）` : '已提交（打印异常）'
+          }
+          toastTitle = reasonTitles[printReason] || (queueNumber ? `取餐号 #${queueNumber}（打印未成功）` : '已提交（打印未成功）')
+          if (printError && printReason === 'print_failed') {
+            console.warn('打印失败详情:', printError)
+          }
         }
       }
       wx.showToast({
         title: toastTitle,
-        icon: (printed || printPending) ? 'success' : 'none',
+        icon: (skipPrint || printed || printPending) ? 'success' : 'none',
         duration: 2500
       })
 
